@@ -53,27 +53,28 @@ void loop() {
   {
     id: 'harorat',
     file: 'nafas_harorat.ino',
-    title: 'Harorat 40°C (LM35)',
+    title: 'Harorat 40°C (DHT22)',
     note: 'Isitkichni yoqing — 40°C dan oshsa signal.',
     code: `// NAFAS — harorat nazorati
-// LM35 harorat sensori {{LM35}} pinga ulangan (10 mV = 1°C).
+// DHT22 sensori {{DHT}} pinga ulangan.
+#include <DHT.h>
 
-const int TEMP_PIN = {{LM35}};
-const int BUZZER = {{BUZZER}};
-const int LED = {{LED}};
+#define DHTPIN {{DHT}}
+#define BUZZER {{BUZZER}}
+#define LED {{LED}}
 
+DHT dht(DHTPIN, DHT22);
 float chegara = 40.0;   // °C
 
 void setup() {
   Serial.begin(9600);
+  dht.begin();
   pinMode(BUZZER, OUTPUT);
   pinMode(LED, OUTPUT);
 }
 
 void loop() {
-  int xom = analogRead(TEMP_PIN);
-  float volt = xom * {{VREF}} / {{ADCMAX}}.0;
-  float harorat = volt * 100.0;
+  float harorat = dht.readTemperature();
 
   Serial.print("Harorat: ");
   Serial.print(harorat, 1);
@@ -87,6 +88,46 @@ void loop() {
     digitalWrite(LED, LOW);
   }
   delay(1000);
+}
+`,
+  },
+  {
+    id: 'harakat',
+    file: 'nafas_harakat.ino',
+    title: 'Harakat sensori + tugma',
+    note: 'PIR harakatni sezadi, tugma signalni o‘chiradi.',
+    code: `// Harakat sensori (HC-SR501) va signalni o'chirish tugmasi
+#define PIR {{PIR}}
+#define TUGMA {{BUTTON}}
+#define LED {{LED}}
+#define BUZZER {{BUZZER}}
+
+bool signalYoniq = false;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(PIR, INPUT);
+  pinMode(TUGMA, INPUT_PULLUP);
+  pinMode(LED, OUTPUT);
+  pinMode(BUZZER, OUTPUT);
+}
+
+void loop() {
+  if (digitalRead(PIR) == HIGH && !signalYoniq) {
+    Serial.println("Xonada harakat bor!");
+    signalYoniq = true;
+  }
+
+  // Tugma bosilganda LOW bo'ladi (INPUT_PULLUP)
+  if (digitalRead(TUGMA) == LOW) {
+    Serial.println("Signal o'chirildi");
+    signalYoniq = false;
+    delay(300);
+  }
+
+  digitalWrite(LED, signalYoniq ? HIGH : LOW);
+  digitalWrite(BUZZER, signalYoniq && (millis() / 250) % 2 ? HIGH : LOW);
+  delay(20);
 }
 `,
   },
@@ -254,7 +295,7 @@ export function exampleCode(ex, board) {
     return String(pin);
   };
   const vals = {
-    PROPAN: name(w.propane), METAN: name(w.methane), LM35: name(w.lm35), DHT: name(w.dht),
+    PROPAN: name(w.propane), METAN: name(w.methane), DHT: name(w.dht), PIR: name(w.pir), BUTTON: name(w.button),
     BUZZER: name(w.buzzer), LED: name(w.led), VREF: board.vref.toFixed(1), ADCMAX: String(2 ** board.adcBits - 1),
   };
   return ex.code.replace(/\{\{(\w+)\}\}/g, (_, k) => vals[k]);

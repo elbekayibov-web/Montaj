@@ -5,6 +5,7 @@ import { Runtime } from '../src/sim/runtime.js';
 import { BOARDS } from '../src/sim/boards.js';
 import { EXAMPLES as RAW, exampleCode } from '../src/sim/examples.js';
 const EXAMPLES = RAW.map((e) => ({ ...e, code: exampleCode(e, BOARDS.uno) }));
+const ex = (id) => EXAMPLES.find((e) => e.id === id).code;
 
 function build(code, board = BOARDS.uno) {
   const r = compile(code, board);
@@ -46,31 +47,31 @@ test('all examples compile on every board', () => {
 });
 
 test('gas example: safe vs danger follows threshold', async () => {
-  const safe = await run(EXAMPLES[0].code, { ms: 1400 });
+  const safe = await run(ex('gaz'), { ms: 1400 });
   assert.match(safe.out, /NAFAS tayyor!/);
   assert.match(safe.out, /Gaz darajasi: \d+\r\nXavfsiz/);
-  const danger = await run(EXAMPLES[0].code, { ms: 1400, sensors: { propane: 900 } });
+  const danger = await run(ex('gaz'), { ms: 1400, sensors: { propane: 900 } });
   assert.match(danger.out, /XAVF!/);
   // Changing the threshold in code changes behaviour.
-  const hi = await run(EXAMPLES[0].code.replace('int chegara = 200;', 'int chegara = 900;'), { ms: 1400, sensors: { propane: 900 } });
+  const hi = await run(ex('gaz').replace('int chegara = 200;', 'int chegara = 900;'), { ms: 1400, sensors: { propane: 900 } });
   assert.doesNotMatch(hi.out, /XAVF!/);
   // Changing the printed text changes the monitor.
-  const txt = await run(EXAMPLES[0].code.replace('"Gaz darajasi: "', '"GAS = "'), { ms: 1400 });
+  const txt = await run(ex('gaz').replace('"Gaz darajasi: "', '"GAS = "'), { ms: 1400 });
   assert.match(txt.out, /GAS = \d+/);
 });
 
-test('temperature example with LM35 and DHT', async () => {
-  const cold = await run(EXAMPLES[1].code, { ms: 300 });
-  assert.match(cold.out, /Harorat: 2[34]\.\d C/);
-  const hot = await run(EXAMPLES[1].code, { ms: 300, sensors: { temperature: 45 } });
+test('temperature examples with DHT22', async () => {
+  const cold = await run(ex('harorat'), { ms: 300 });
+  assert.match(cold.out, /Harorat: 2[345]\.\d C/);
+  const hot = await run(ex('harorat'), { ms: 300, sensors: { temperature: 45 } });
   assert.match(hot.out, /DIQQAT/);
-  const full = await run(EXAMPLES[2].code, { ms: 1500, sensors: { temperature: 45, methane: 2000 } });
+  const full = await run(ex('toliq'), { ms: 1500, sensors: { temperature: 45, methane: 2000 } });
   assert.match(full.out, /T=4[45]\.\dC/);
   assert.match(full.out, /XAVF! Bir nechta/);
 });
 
 test('serial input', async () => {
-  const r = await run(EXAMPLES[3].code, { ms: 1500, input: '350\n' });
+  const r = await run(ex('serial'), { ms: 1500, input: '350\n' });
   assert.match(r.out, /Chegara o'zgardi: 350/);
 });
 
@@ -129,7 +130,7 @@ test('syntax errors use gcc wording', () => {
 });
 
 test('warnings for assignment in condition', () => {
-  const r = compile(EXAMPLES[4].code, BOARDS.uno);
+  const r = compile(ex('xato'), BOARDS.uno);
   assert.ok(r.warnings.some((w) => /parentheses/.test(w.msg)));
 });
 
@@ -145,5 +146,14 @@ test('missing pinMode diag', async () => {
 
 test('ESP32 example uses ESP32 wiring', async () => {
   const r = await run(exampleCode(RAW[1], BOARDS.esp32), { board: BOARDS.esp32, ms: 300, sensors: { temperature: 45 } });
+  assert.match(r.out, /DIQQAT/);
   assert.match(r.out, /Harorat: 4[45]\.\d C/);
+});
+
+test('PIR and button', async () => {
+  const code = exampleCode(RAW.find((e) => e.id === 'harakat'), BOARDS.uno);
+  const r = await run(code, { ms: 300, sensors: { motion: 1, button: 0 } });
+  assert.match(r.out, /Xonada harakat bor!/);
+  const b = await run(code, { ms: 300, sensors: { motion: 0, button: 1 } });
+  assert.match(b.out, /Signal o'chirildi/);
 });

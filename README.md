@@ -15,8 +15,7 @@ npm test         # kompilyator va simulyator testlari
 
 | TZ bandi | Holat |
 |---|---|
-| 4–5. Kirish: Nafas Nano 3D modeli, aylantirish | ✅ Rasm asosida: oq korpus, ko‘k LED, ventilyatsiya, “NAFAS” yozuvi. Sichqoncha/barmoq bilan aylantiriladi |
-| 4. Skroll animatsiyasi | ✅ Taklif: skroll qilinganda qurilma qismlarga ajraladi (DHT22, MH-Z19, MQ, ESP32 plata, batareya, korpus) — rasmdagi “exploded view” |
+| 4–5. Kirish sahifasi | Olib tashlandi (so‘rov bo‘yicha): sayt to‘g‘ridan-to‘g‘ri xona bilan ochiladi |
 | 6. Virtual xona | ✅ Eshik, divan, televizor, isitkich (radiator), deraza, gaz quvuri; qurilma eshik yonida, devorning yuqorisida |
 | 7. Sensor paneli | ✅ Harorat (°C), propan, metan — jonli qiymat, ADC qiymati, grafik |
 | 8–9. Arduino IDE ko‘rinishidagi muharrir | ✅ To‘q tema, rangli kod, qator raqamlari, `.ino` yorlig‘i, Verify / Upload, plata tanlash |
@@ -46,16 +45,28 @@ Haqiqiy Arduino xatti-harakatlari saqlangan, chunki talaba aynan shularda xato q
 - `if (x = 5)` va `if (...);` uchun ogohlantirish.
 - Sensor ulanmagan pindan `analogRead` “suzuvchi” qiymat qaytaradi.
 
-### Virtual ulanish (Nafas shield)
+### Virtual ulanish (qurilmaning ichki sxemasi)
 
 | Qism | Uno / Nano | ESP32 |
 |---|---|---|
 | MQ-2 propan | A0 | GPIO34 |
 | MQ-4 metan | A1 | GPIO35 |
-| LM35 harorat | A2 | GPIO32 |
-| DHT22 | D2 | GPIO4 |
+| DHT22 | A2 | GPIO4 |
 | Buzzer (faol) | D8 | GPIO25 |
 | Signal LED | D13 | GPIO2 |
+| PIR (HC-SR501) | D10 | GPIO27 |
+| Tugma → GND | D4 | GPIO0 |
+| ESP32 Wi-Fi modul | TX (D1) | — |
+
+Sxema Workbench’da jonli ko‘rsatiladi (Wokwi uslubida): LED yonadi, buzzer “chalinadi”,
+tugmani sichqoncha bilan bosish mumkin, sensor qiymatlari ko‘rinadi.
+
+### Xona
+
+Kechki yoritish (CC0 “apartment” HDRI — `@pmndrs/assets`), ambient occlusion (N8AO),
+Van Gog rasmlari (internet bo‘lsa Wikimedia’dan asl rasm, bo‘lmasa generativ nusxa),
+oshxona burchagida propan ballon va sariq metan quvuri yonma-yon. Propan polga cho‘kadi,
+metan shipga ko‘tariladi.
 
 ## Hali kelishilmagan (TZ 16–19)
 

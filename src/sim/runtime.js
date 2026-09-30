@@ -381,8 +381,16 @@ export class Runtime {
         if (!rt.validPin(p, 'digitalRead')) return 0;
         const st = rt.pin(p);
         if (st.mode === 1) return st.value;
-        if (st.mode === 2) return 1;
+        if (st.mode === 2 && p !== W.button) return 1;
         if (p === W.dht) return 1; // DHT data line idles high (pull-up)
+        if (p === W.pir) return rt.hw.readSensor('motion') ? 1 : 0; // PIR drives its output
+        if (p === W.button) {
+          // Button connects the pin to GND: pressed = LOW. Without the pull-up it floats.
+          if (rt.hw.readSensor('button')) return 0;
+          if (st.mode === 2) return 1;
+          rt.diag('btn-float', `Tugma ${nameOf(p)}-pinda: pinMode(${nameOf(p)}, INPUT_PULLUP) yozilmagan, shuning uchun bosilmaganda qiymat tasodifiy (suzuvchi).`);
+          return rt.rand() > 0.5 ? 1 : 0;
+        }
         return rt.rand() > 0.5 ? 1 : 0; // floating input
       },
       async analogRead(p) {
@@ -394,13 +402,13 @@ export class Runtime {
         let frac;
         if (p === W.propane) frac = mqVoltage(rt.hw.readSensor('propane') + 0.12 * rt.hw.readSensor('methane'), 2600) / 5;
         else if (p === W.methane) frac = mqVoltage(rt.hw.readSensor('methane') + 0.1 * rt.hw.readSensor('propane'), 3400) / 5;
-        else if (p === W.lm35) frac = (rt.hw.readSensor('temperature') * 0.01) / B.vref;
+        else if (p === W.dht) frac = 0.97; // DHT data line idles high
         else {
           const isAnalog = Object.values(B.analogNames).includes(p);
           if (!isAnalog) {
             rt.diag(`notanalog-${p}`, `analogRead(${p}): bu pin analog kirish emas yoki unga hech narsa ulanmagan — tasodifiy qiymatlar keladi.`);
           } else {
-            rt.diag(`floating-${p}`, `analogRead(${nameOf(p)}): bu pinga sensor ulanmagan, qiymatlar “suzib” yuradi. Sensorlar: propan ${nameOf(W.propane)}, metan ${nameOf(W.methane)}, LM35 ${nameOf(W.lm35)}.`);
+            rt.diag(`floating-${p}`, `analogRead(${nameOf(p)}): bu pinga sensor ulanmagan, qiymatlar “suzib” yuradi. Gaz sensorlari: propan ${nameOf(W.propane)}, metan ${nameOf(W.methane)}.`);
           }
           const prev = rt.floating.get(p) ?? 0.35;
           const next = Math.min(0.8, Math.max(0.1, prev + (rt.rand() - 0.5) * 0.08));

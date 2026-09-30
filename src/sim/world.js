@@ -19,6 +19,8 @@ export class World {
     this.propaneLeak = false;
     this.methaneLeak = false;
     this.window = false;
+    this.motion = false; // someone in the room (PIR)
+    this.button = false; // push button held down
     this.heaterPower = 0; // 0..1, coils warm up gradually
     this.history = [];
     this.t = 0;

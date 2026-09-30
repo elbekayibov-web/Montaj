@@ -1,4 +1,3 @@
-import { createHero } from './three/hero.js';
 import { createRoom } from './three/room.js';
 import { World } from './sim/world.js';
 import { BOARDS, WIRING_INFO, pinLabel } from './sim/boards.js';
@@ -8,6 +7,7 @@ import { EXAMPLES, exampleCode } from './sim/examples.js';
 import { createEditor } from './ui/editor.js';
 import { Buzzer } from './ui/audio.js';
 import { createSparkline } from './ui/sparkline.js';
+import { createCircuit } from './ui/circuit.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -15,29 +15,27 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem(`nafas:${k}`); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(`nafas:${k}`, JSON.stringify(v)); } catch { /* private mode */ } },
 };
-const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// ---------------------------------------------------------------- hero
-const heroSection = $('.hero');
-const hero = createHero($('#heroCanvas'), $('#heroLabels'));
-function onScroll() {
-  const r = heroSection.getBoundingClientRect();
-  const total = heroSection.offsetHeight - window.innerHeight;
-  const p = Math.max(0, Math.min(1, -r.top / Math.max(1, total)));
-  // assembled → exploded during the first 60% of the hero, then hold
-  hero.setProgress(Math.min(1, Math.max(0, (p - 0.08) / 0.5)));
-  $('.scroll-cue').style.opacity = p > 0.05 ? '0' : '1';
-  $('.drag-hint').style.opacity = p > 0.05 ? '0' : '1';
-}
-window.addEventListener('scroll', onScroll, { passive: true });
-onScroll();
-
-// ---------------------------------------------------------------- world + room
+// ---------------------------------------------------------------- state
 const world = new World();
-const room = createRoom($('#roomCanvas'), $('#roomOverlay'));
+let board = BOARDS[store.get('board', 'uno')] || BOARDS.uno;
+const pinState = new Map();
+let running = false;
+let startedAt = 0;
+
+// ---------------------------------------------------------------- room
+const room = createRoom($('#roomCanvas'), {
+  onDeviceClick: () => {
+    $('#circuit').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('#circuit').animate([{ boxShadow: 'inset 0 0 0 2px #2dd4bf' }, { boxShadow: 'inset 0 0 0 2px transparent' }], { duration: 1600, delay: 500 });
+  },
+});
 $('#focusDevice').onclick = () => room.focusDevice();
 $('#resetView').onclick = () => room.resetView();
 
+// ---------------------------------------------------------------- sound
 const buzzer = new Buzzer();
 let muted = store.get('muted', false);
 buzzer.setMuted(muted);
@@ -51,6 +49,7 @@ $('#soundToggle').onclick = () => {
 };
 document.addEventListener('pointerdown', () => buzzer.unlock(), { once: true });
 
+// ---------------------------------------------------------------- equipments
 for (const b of $$('.eq[data-eq]')) {
   b.onclick = () => {
     const k = b.dataset.eq;
@@ -63,14 +62,29 @@ $('#resetWorld').onclick = () => {
   $$('.eq[data-eq]').forEach((b) => b.classList.remove('on'));
 };
 
-// ---------------------------------------------------------------- board + pins
-let board = BOARDS[store.get('board', 'uno')] || BOARDS.uno;
-const pinState = new Map();
-let running = false;
+// ---------------------------------------------------------------- rail navigation
+const navTargets = ['room', 'circuit', 'ide', 'serial'];
+const navObs = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    const id = e.target.id === 'ide' ? 'ide' : e.target.id;
+    $$('.rail-btn[data-nav]').forEach((a) => a.classList.toggle('active', a.dataset.nav === id));
+  }
+}, { threshold: 0.55 });
+for (const id of ['room', 'ide']) navObs.observe($(`#${id}`));
+$$('.rail-btn[data-nav]').forEach((a) => {
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    const t = $(`#${a.dataset.nav}`);
+    t.scrollIntoView({ behavior: 'smooth', block: a.dataset.nav === 'room' || a.dataset.nav === 'ide' ? 'start' : 'center' });
+    if (a.dataset.nav === 'serial') showTab('serial');
+  });
+});
+void navTargets;
 
+// ---------------------------------------------------------------- pins → actuators
 function pinOut(key) {
-  const st = pinState.get(board.wiring[key]);
-  return st || { mode: 0, value: 0, pwm: 0, tone: 0 };
+  return pinState.get(board.wiring[key]) || { mode: 0, value: 0, pwm: 0, tone: 0 };
 }
 function buzzerLevel() {
   const st = pinOut('buzzer');
@@ -83,14 +97,14 @@ function ledLevel() {
   const st = pinOut('led');
   if (st.pwm) return st.pwm / 255;
   if (!st.value) return 0;
-  return st.mode === 1 ? 1 : 0.12; // no pinMode -> dim via pull-up
+  return st.mode === 1 ? 1 : 0.12; // no pinMode → dim through the pull-up
 }
 
-// ---------------------------------------------------------------- sensors panel
+// ---------------------------------------------------------------- readings
 const sparks = {
-  temperature: createSparkline($('[data-m="temperature"] .spark'), { color: '#e8475f', format: (v) => `${v.toFixed(1)}°C` }),
-  propane: createSparkline($('[data-m="propane"] .spark'), { color: '#7c5cf5', format: (v) => `${Math.round(v)} ppm` }),
-  methane: createSparkline($('[data-m="methane"] .spark'), { color: '#f07a1a', format: (v) => `${Math.round(v)} ppm` }),
+  temperature: createSparkline($('[data-m="temperature"] .spark'), { color: '#f0786e', format: (v) => `${v.toFixed(1)}°C` }),
+  propane: createSparkline($('[data-m="propane"] .spark'), { color: '#a78bfa', format: (v) => `${Math.round(v)} ppm` }),
+  methane: createSparkline($('[data-m="methane"] .spark'), { color: '#fb923c', format: (v) => `${Math.round(v)} ppm` }),
 };
 function adcFor(key) {
   const max = 2 ** board.adcBits - 1;
@@ -105,28 +119,25 @@ function badge(el, level, text) {
 function renderSensors() {
   const T = $('[data-m="temperature"]');
   $('[data-v]', T).textContent = world.temperature.toFixed(1);
-  $('[data-sub]', T).textContent = `namlik ${Math.round(world.humidity)}%`;
+  $('[data-sub]', T).textContent = `${Math.round(world.humidity)}% namlik`;
   const tl = world.temperature > 45 ? 2 : world.temperature > 32 ? 1 : 0;
   badge($('[data-badge]', T), tl, ['me’yorda', 'issiq', 'juda issiq'][tl]);
   for (const k of ['propane', 'methane']) {
     const el = $(`[data-m="${k}"]`);
     $('[data-v]', el).textContent = Math.round(world[k]);
     $('[data-sub]', el).textContent = `ADC ${adcFor(k)}`;
-    const v = world[k];
-    const lvl = v > 700 ? 2 : v > 150 ? 1 : 0;
-    badge($('[data-badge]', el), lvl, ['toza havo', 'sezilarli', 'xavfli'][lvl]);
+    const lvl = world[k] > 700 ? 2 : world[k] > 150 ? 1 : 0;
+    badge($('[data-badge]', el), lvl, ['toza', 'sezilarli', 'xavfli'][lvl]);
   }
 }
-function renderWiring() {
-  $('#wiringBoard').textContent = board.name;
-  $('#wiringList').innerHTML = WIRING_INFO.map((w) => `<li><b>${w.part}</b><span>${w.role}</span><code>${pinLabel(board, board.wiring[w.key])}</code></li>`).join('');
-}
+
+// ---------------------------------------------------------------- circuit
+const circuit = createCircuit($('#circuit'), { onButton: (v) => { world.button = v; } });
 
 // ---------------------------------------------------------------- main loop
 let last = performance.now();
 let uiAcc = 0;
-let sparkAcc = 0;
-let lastAlarm = false;
+let sparkAcc = 1;
 function loop(now) {
   requestAnimationFrame(loop);
   const dt = (now - last) / 1000;
@@ -134,20 +145,30 @@ function loop(now) {
   world.step(dt);
   const bz = buzzerLevel();
   const led = ledLevel();
-  const alarm = bz.freq > 0;
+  const alarm = running && bz.freq > 0;
   buzzer.set(running ? bz.freq : 0, bz.level);
   room.update({
     temperature: world.temperature, propane: world.propane, methane: world.methane, heater: world.heater,
     heaterPower: world.heaterPower, propaneLeak: world.propaneLeak, methaneLeak: world.methaneLeak, window: world.window,
     buzzer: alarm ? 1 : 0, led, running, alarm,
   });
-  if (alarm !== lastAlarm) {
-    lastAlarm = alarm;
-    $('#alarmBanner').classList.toggle('show', alarm);
-    $('#ioBuzzer').classList.toggle('on', alarm);
-    updateRunState();
-  }
+  $('#ioBuzzer').classList.toggle('on', alarm);
   $('#ioLed').classList.toggle('on', led > 0.3);
+  $('#ioPir').classList.toggle('on', world.motion);
+  const ring = $('#unitLed');
+  ring.classList.toggle('run', running && led <= 0.3);
+  ring.classList.toggle('alarm', running && led > 0.3);
+  circuit.update({
+    running, led, buzzer: alarm, motion: world.motion,
+    pinValue: (p) => (pinState.get(p)?.value || pinState.get(p)?.pwm || pinState.get(p)?.tone ? 1 : 0),
+    sensors: world, adc: { propane: adcFor('propane'), methane: adcFor('methane') },
+  });
+  if (running) {
+    const ms = Math.floor(now - startedAt);
+    const mm = String(Math.floor(ms / 60000)).padStart(2, '0');
+    const ss = String(Math.floor(ms / 1000) % 60).padStart(2, '0');
+    $('#simTime').textContent = `${mm}:${ss}.${String(ms % 1000).padStart(3, '0')}`;
+  }
   uiAcc += dt;
   if (uiAcc > 0.2) { uiAcc = 0; renderSensors(); }
   sparkAcc += dt;
@@ -159,116 +180,180 @@ function loop(now) {
 }
 requestAnimationFrame(loop);
 
-function updateRunState() {
-  const el = $('#runState');
-  el.classList.toggle('on', running);
-  el.classList.toggle('alarm', running && lastAlarm);
-  $('.txt', el).textContent = !running
-    ? 'Qurilma o‘chiq — kodni yuklang'
-    : lastAlarm ? 'Signal chalinmoqda!' : `${board.name} ishlamoqda`;
-}
-
-// ---------------------------------------------------------------- IDE
+// ---------------------------------------------------------------- editor
 const output = $('#output');
 const serialOut = $('#serialOut');
 const toast = $('#ideToast');
 let currentExample = store.get('example', 'gaz');
 let fileName = store.get('file', EXAMPLES[0].file);
-let savedCode = store.get('code', null);
-let dirtyFromExample = store.get('dirty', false);
+let dirty = store.get('dirty', false);
 let loadingCode = false;
-function loadCode(code) {
-  loadingCode = true;
-  editor.value = code;
-  loadingCode = false;
-}
 
 const editor = createEditor($('#editor'), {
-  doc: savedCode ?? exampleCode(EXAMPLES.find((e) => e.id === currentExample) || EXAMPLES[0], board),
+  doc: store.get('code', null) ?? exampleCode(EXAMPLES.find((e) => e.id === currentExample) || EXAMPLES[0], board),
   onChange(v) {
     store.set('code', v);
     if (loadingCode) return;
-    dirtyFromExample = true;
-    store.set('dirty', true);
-    $('#dirtyDot').classList.add('dirty');
+    setDirty(true);
     editor.clearProblems();
   },
   onCursor(l, c) { $('#statusPos').textContent = `Ln ${l}, Col ${c}`; },
   keys: [
     { key: 'Mod-r', preventDefault: true, run: () => { verify(); return true; } },
     { key: 'Mod-u', preventDefault: true, run: () => { upload(); return true; } },
-    { key: 'Mod-s', preventDefault: true, run: () => { $('#dirtyDot').classList.remove('dirty'); return true; } },
+    { key: 'Mod-s', preventDefault: true, run: () => { remember(); return true; } },
   ],
 });
+function setDirty(v) {
+  dirty = v;
+  store.set('dirty', v);
+  $('#dirtyDot').classList.toggle('dirty', v);
+  renderExamples();
+}
+function loadCode(code, name, exampleId = null) {
+  loadingCode = true;
+  editor.value = code;
+  loadingCode = false;
+  fileName = name;
+  currentExample = exampleId;
+  store.set('file', name);
+  store.set('example', exampleId);
+  $('#fileName').textContent = name;
+  editor.clearProblems();
+  showFile('sketch');
+  setDirty(false);
+  renderRecent();
+}
 $('#fileName').textContent = fileName;
+$('#dirtyDot').classList.toggle('dirty', dirty);
 window.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') { e.preventDefault(); verify(); }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') { e.preventDefault(); upload(); }
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'm') { e.preventDefault(); showTab('serial'); }
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && e.key.toLowerCase() === 'r') { e.preventDefault(); verify(); }
+  if (mod && e.key.toLowerCase() === 'u') { e.preventDefault(); upload(); }
+  if (mod && e.shiftKey && e.key.toLowerCase() === 'm') { e.preventDefault(); showTab('serial'); }
 });
+
+// file tabs (sketch.ino / diagram.json / libraries.txt)
+function diagramJson() {
+  const partType = { propane: 'wokwi-gas-sensor', methane: 'wokwi-gas-sensor', dht: 'wokwi-dht22', buzzer: 'wokwi-buzzer', led: 'wokwi-led', pir: 'wokwi-pir-motion-sensor', button: 'wokwi-pushbutton' };
+  const boardType = { uno: 'wokwi-arduino-uno', nano: 'wokwi-arduino-nano', esp32: 'board-esp32-devkit-c-v4' }[board.id];
+  const parts = [{ type: boardType, id: board.id, top: 0, left: 0, attrs: {} }];
+  const connections = [];
+  for (const w of WIRING_INFO) {
+    parts.push({ type: partType[w.key], id: w.key, attrs: w.key === 'led' ? { color: 'red' } : {} });
+    connections.push([`${w.key}:${w.key === 'button' ? '1.l' : w.key === 'led' ? 'A' : w.key === 'buzzer' ? '2' : w.key === 'dht' ? 'SDA' : w.key === 'pir' ? 'OUT' : 'AOUT'}`, `${board.id}:${pinLabel(board, board.wiring[w.key]).replace(/^D|^GPIO/, '')}`, 'green', []]);
+  }
+  if (board.arch === 'avr') {
+    parts.push({ type: 'board-esp32-devkit-c-v4', id: 'wifi', attrs: {} });
+    connections.push([`${board.id}:1`, 'wifi:RX', 'blue', []]);
+  }
+  return JSON.stringify({ version: 1, author: 'NAFAS', editor: 'nafas-lab', parts, connections }, null, 2);
+}
+function showFile(name) {
+  $$('.file').forEach((f) => f.classList.toggle('active', f.dataset.file === name));
+  const aux = $('#auxView');
+  if (name === 'sketch') { aux.hidden = true; return; }
+  aux.hidden = false;
+  aux.textContent = name === 'diagram'
+    ? diagramJson()
+    : '# NAFAS kutubxonalari\n# Sketch ishlatishi mumkin bo‘lgan kutubxonalar:\n\nDHT sensor library   (#include <DHT.h>)\nWire                 (#include <Wire.h>)\nSPI                  (#include <SPI.h>)\n';
+}
+$$('.file').forEach((f) => { f.onclick = () => showFile(f.dataset.file); });
 
 // board select
 const boardSelect = $('#boardSelect');
 boardSelect.innerHTML = Object.values(BOARDS).map((b) => `<option value="${b.id}">${b.name}</option>`).join('');
 boardSelect.value = board.id;
 function applyBoard() {
-  $('#statusBoard').textContent = `${board.name} on ${board.port}`;
-  $('#serialInput').placeholder = `Message (Enter to send message to '${board.name}' on '${board.port}')`;
-  renderWiring();
+  $('#statusBoard').textContent = `${board.name} · ${board.port}`;
+  $('#unitBoard').textContent = board.name;
+  circuit.setBoard(board);
+  if (!$('#auxView').hidden && $('.file.active').dataset.file === 'diagram') showFile('diagram');
 }
 boardSelect.onchange = () => {
-  const prevBoard = board;
+  const prev = board;
   board = BOARDS[boardSelect.value];
   store.set('board', board.id);
   if (running) stopDevice('Plata almashtirildi — kodni qayta yuklang.');
-  // Untouched example -> switch its pin numbers to the new board's wiring.
   const ex = EXAMPLES.find((e) => e.id === currentExample);
-  if (ex && editor.value === exampleCode(ex, prevBoard)) {
-    loadCode(exampleCode(ex, board));
-    dirtyFromExample = false;
-    store.set('dirty', false);
-    $('#dirtyDot').classList.remove('dirty');
-  }
+  if (ex && editor.value === exampleCode(ex, prev)) loadCode(exampleCode(ex, board), ex.file, ex.id);
   applyBoard();
 };
 applyBoard();
 
-// examples
-const menu = $('#examplesMenu');
-menu.innerHTML = EXAMPLES.map((e) => `<button data-ex="${e.id}"><b>${e.title}</b><small>${e.note}</small></button>`).join('');
-$('#btnExamples').onclick = (e) => { e.stopPropagation(); menu.classList.toggle('open'); };
-menu.addEventListener('click', (e) => e.stopPropagation());
-function resetMenuConfirm() {
-  for (const x of $$('button.confirm', menu)) { x.classList.remove('confirm'); $('small', x).textContent = $('small', x).dataset.note; }
+// ---------------------------------------------------------------- examples & recent sketches
+let confirming = null; // id of the item waiting for a second click
+function guarded(id, action) {
+  if (dirty && confirming !== id) {
+    confirming = id;
+    renderExamples();
+    renderRecent();
+    return;
+  }
+  confirming = null;
+  action();
 }
-document.addEventListener('click', () => { menu.classList.remove('open'); resetMenuConfirm(); });
-for (const b of $$('button', menu)) {
-  b.onclick = () => {
-    const ex = EXAMPLES.find((x) => x.id === b.dataset.ex);
-    // Two-step confirm inside the menu instead of window.confirm().
-    if (dirtyFromExample && !b.classList.contains('confirm')) {
-      $$('button', menu).forEach((x) => x.classList.remove('confirm'));
-      b.classList.add('confirm');
-      $('small', b).dataset.note = $('small', b).textContent;
-      $('small', b).textContent = 'Kodingiz o‘zgargan. Almashtirish uchun yana bosing.';
-      return;
-    }
-    b.classList.remove('confirm');
-    currentExample = ex.id;
-    fileName = ex.file;
-    loadCode(exampleCode(ex, board));
-    dirtyFromExample = false;
-    store.set('example', ex.id);
-    store.set('file', ex.file);
-    store.set('dirty', false);
-    $('#fileName').textContent = fileName;
-    $('#dirtyDot').classList.remove('dirty');
-    editor.clearProblems();
-    menu.classList.remove('open');
-  };
+document.addEventListener('click', (e) => {
+  if (confirming && !e.target.closest('.file-item')) { confirming = null; renderExamples(); renderRecent(); }
+});
+const FILE_ICON = '<svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /></svg>';
+function renderExamples() {
+  $('#examplesList').innerHTML = EXAMPLES.map((e) => {
+    const cur = !dirty && currentExample === e.id;
+    const conf = confirming === `ex:${e.id}`;
+    return `<button class="file-item${cur ? ' current' : ''}${conf ? ' confirm' : ''}" data-ex="${e.id}"><span class="fi">${FILE_ICON}</span><span class="meta"><span>${esc(e.title)}</span><small>${conf ? 'Kod o‘zgargan — almashtirish uchun yana bosing' : esc(e.note)}</small></span></button>`;
+  }).join('');
+  for (const b of $$('[data-ex]', $('#examplesList'))) {
+    b.onclick = () => {
+      const ex = EXAMPLES.find((x) => x.id === b.dataset.ex);
+      guarded(`ex:${ex.id}`, () => loadCode(exampleCode(ex, board), ex.file, ex.id));
+    };
+  }
 }
 
-// console tabs
+function recentList() { return store.get('recent', []); }
+function remember() {
+  const code = editor.value;
+  let list = recentList().filter((r) => r.code !== code);
+  list.unshift({ id: Date.now(), name: fileName, board: board.id, code, t: Date.now() });
+  list = list.slice(0, 10);
+  store.set('recent', list);
+  renderRecent();
+}
+function ago(t) {
+  const s = Math.round((Date.now() - t) / 1000);
+  if (s < 60) return 'hozirgina';
+  if (s < 3600) return `${Math.round(s / 60)} daqiqa oldin`;
+  if (s < 86400) return `${Math.round(s / 3600)} soat oldin`;
+  return new Date(t).toLocaleDateString('uz-UZ');
+}
+function renderRecent() {
+  const list = recentList();
+  $('#recentCount').textContent = list.length;
+  if (!list.length) {
+    $('#recentList').innerHTML = '<div class="empty">Kod yuklanganda (Upload) yoki Ctrl+S bosilganda shu yerda saqlanadi.</div>';
+    return;
+  }
+  $('#recentList').innerHTML = list.map((r) => {
+    const conf = confirming === `rc:${r.id}`;
+    const lines = r.code.split('\n').length;
+    return `<button class="file-item${conf ? ' confirm' : ''}" data-rc="${r.id}"><span class="fi">${FILE_ICON}</span><span class="meta"><span>${esc(r.name)}</span><small>${conf ? 'Kod o‘zgargan — almashtirish uchun yana bosing' : `${ago(r.t)} · ${lines} qator · ${BOARDS[r.board]?.name ?? ''}`}</small></span></button>`;
+  }).join('');
+  for (const b of $$('[data-rc]', $('#recentList'))) {
+    b.onclick = () => {
+      const r = recentList().find((x) => String(x.id) === b.dataset.rc);
+      guarded(`rc:${r.id}`, () => {
+        if (BOARDS[r.board] && r.board !== board.id) { board = BOARDS[r.board]; boardSelect.value = board.id; store.set('board', board.id); applyBoard(); }
+        loadCode(r.code, r.name, null);
+      });
+    };
+  }
+}
+renderExamples();
+renderRecent();
+setInterval(renderRecent, 60000);
+
+// ---------------------------------------------------------------- console tabs + output
 function showTab(name) {
   $$('.ctab').forEach((t) => t.classList.toggle('active', t.dataset.tab === name));
   $('#paneOutput').classList.toggle('active', name === 'output');
@@ -276,43 +361,31 @@ function showTab(name) {
   $(`.ctab[data-tab="${name}"]`).classList.remove('pending');
 }
 $$('.ctab').forEach((t) => { t.onclick = () => showTab(t.dataset.tab); });
-$('#btnSerialFocus').onclick = () => { showTab('serial'); $('#serialInput').focus(); };
-$('.ctab[data-tab="output"]').insertAdjacentHTML('beforeend', '<i class="new-dot"></i>');
-function activeTab() { return $('.ctab.active').dataset.tab; }
-function flagTab(name) { if (activeTab() !== name) $(`.ctab[data-tab="${name}"]`).classList.add('pending'); }
-
-// output helpers
+const activeTab = () => $('.ctab.active').dataset.tab;
+const flagTab = (name) => { if (activeTab() !== name) $(`.ctab[data-tab="${name}"]`).classList.add('pending'); };
 function out(html) {
   output.insertAdjacentHTML('beforeend', html);
   output.scrollTop = output.scrollHeight;
 }
-function clearOutput() { output.innerHTML = ''; }
-
+const clearOutput = () => { output.innerHTML = ''; };
 function showToast(text, pct, done) {
   $('.toast-txt', toast).textContent = text;
   $('.toast-bar i', toast).style.width = `${pct}%`;
   toast.classList.toggle('done', !!done);
   toast.classList.add('show');
   clearTimeout(showToast.t);
-  if (done) showToast.t = setTimeout(() => toast.classList.remove('show'), 2600);
+  if (done) showToast.t = setTimeout(() => toast.classList.remove('show'), 2400);
 }
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-
 function sourceExcerpt(line, col) {
   const src = editor.value.split('\n')[line - 1];
   if (src == null) return '';
-  const n = String(line).padStart(5);
-  const pad = ' '.repeat(5);
-  const caret = `${' '.repeat(Math.max(0, col - 1))}^`;
-  return `<span class="dim">${n} | </span>${esc(src)}\n<span class="dim">${pad} | </span><span class="err">${caret}</span>\n`;
+  return `<span class="dim">${String(line).padStart(5)} | </span>${esc(src)}\n<span class="dim">      | </span><span class="err">${' '.repeat(Math.max(0, col - 1))}^</span>\n`;
 }
-
 function formatProblem(p, sev) {
   const loc = p.line ? `${fileName}:${p.line}:${p.col || 1}` : fileName.replace(/\.ino$/, '.ino.cpp.o');
-  const cls = sev === 'error' ? 'err' : 'warn';
-  let s = `<span class="errloc" data-line="${p.line}" data-col="${p.col || 1}">${loc}</span>: <span class="${cls}">${sev}: ${esc(p.message ?? p.msg)}</span>\n`;
+  let s = `<span class="errloc" data-line="${p.line}" data-col="${p.col || 1}">${esc(loc)}</span>: <span class="${sev === 'error' ? 'err' : 'warn'}">${sev}: ${esc(p.message ?? p.msg)}</span>\n`;
   if (p.line) s += sourceExcerpt(p.line, p.col || 1);
-  if (p.hint) s += `<span class="hint">💡 ${esc(p.hint)}</span>`;
+  if (p.hint) s += `<span class="hint">${esc(p.hint)}</span>`;
   return s;
 }
 output.addEventListener('click', (e) => {
@@ -320,6 +393,7 @@ output.addEventListener('click', (e) => {
   if (l && +l.dataset.line) editor.goto(+l.dataset.line, +l.dataset.col);
 });
 
+// ---------------------------------------------------------------- verify / upload
 let busy = false;
 function setBusy(b, which) {
   busy = b;
@@ -328,16 +402,16 @@ function setBusy(b, which) {
   $('#btnVerify').classList.toggle('busy', b && which === 'verify');
   $('#btnUpload').classList.toggle('busy', b && which === 'upload');
 }
-
 async function build(which) {
   clearOutput();
   showTab('output');
+  showFile('sketch');
   editor.clearProblems();
-  showToast('Compiling sketch...', 10);
+  showToast('Compiling sketch...', 15);
   out(`<span class="dim">FQBN: ${board.fqbn}\nCompiling sketch...</span>\n`);
-  await wait(250);
-  showToast('Compiling sketch...', 55);
-  await wait(250);
+  await wait(220);
+  showToast('Compiling sketch...', 60);
+  await wait(220);
   let result;
   try {
     result = compile(editor.value, board);
@@ -355,9 +429,7 @@ async function build(which) {
     return null;
   }
   for (const w of result.warnings) out(formatProblem(w, 'warning'));
-  if (result.warnings.length) {
-    editor.showProblems(result.warnings.map((w) => ({ line: w.line, col: w.col, message: w.msg, hint: w.hint, severity: 'warning' })));
-  }
+  if (result.warnings.length) editor.showProblems(result.warnings.map((w) => ({ line: w.line, col: w.col, message: w.msg, hint: w.hint, severity: 'warning' })));
   const s = result.stats;
   const pct = (a, b) => Math.round((a / b) * 100);
   out(`Sketch uses ${s.flash.toLocaleString('en-US')} bytes (${pct(s.flash, s.flashMax)}%) of program storage space. Maximum is ${s.flashMax.toLocaleString('en-US')} bytes.\n`);
@@ -365,13 +437,11 @@ async function build(which) {
   if (which === 'verify') showToast('Done compiling.', 100, true);
   return result;
 }
-
 async function verify() {
   if (busy) return;
   setBusy(true, 'verify');
   try { await build('verify'); } finally { setBusy(false); }
 }
-
 async function upload() {
   if (busy) return;
   buzzer.unlock();
@@ -379,61 +449,56 @@ async function upload() {
   try {
     const result = await build('upload');
     if (!result) return;
-    showToast('Uploading...', 60);
+    showToast('Uploading...', 70);
     if (board.arch === 'esp32') {
-      out(`<span class="dim">esptool.py v4.6 — Serial port ${board.port}\nConnecting....\nChip is ESP32-D0WD-V3 (revision v3.1)\n`);
-      for (const p of [0, 38, 76, 100]) { out(`Writing at 0x000${(0x10000 + p * 420).toString(16)}... (${p} %)\n`); await wait(160); }
+      out(`<span class="dim">esptool.py v4.6 · ${board.port}\nConnecting....\nChip is ESP32-D0WD-V3 (revision v3.1)\n`);
+      for (const p of [0, 38, 76, 100]) { out(`Writing at 0x000${(0x10000 + p * 420).toString(16)}... (${p} %)\n`); await wait(140); }
       out('Hard resetting via RTS pin...</span>\n');
     } else {
-      await wait(350);
+      await wait(300);
       out(`<span class="dim">avrdude: ${Math.round(result.stats.flash)} bytes of flash written\navrdude: verifying ... done.</span>\n`);
     }
     showToast('Done uploading.', 100, true);
-    out(`<span class="ok">✓ Yuklandi — virtual ${board.name} ishga tushdi.</span>\n`);
+    out(`<span class="ok">✓ ${board.name} ga yuklandi.</span>\n`);
+    remember();
     startDevice(result.factory);
     showTab('serial');
   } finally { setBusy(false); }
 }
 $('#btnVerify').onclick = verify;
 $('#btnUpload').onclick = upload;
-$('#btnStop').onclick = () => { if (running) stopDevice('Qurilma to‘xtatildi.'); };
+$('#btnStop').onclick = () => { if (running) stopDevice(); };
 
 // ---------------------------------------------------------------- runtime
 const runtime = new Runtime(board, {
   readSensor: (k) => world.read(k),
   onPin(pin, st) { pinState.set(pin, st); },
-  onSerial(text) { serialWrite(text); },
+  onSerial(text) { serialWrite(text); circuit.serialActivity(); },
   onSerialBegin(baud) { sketchBaud = baud; },
-  onDiag(_code, msg) {
-    out(`<span class="diag">⚠ ${esc(msg)}</span>`);
-    flagTab('output');
-  },
+  onDiag(_code, msg) { out(`<span class="diag">${esc(msg)}</span>`); flagTab('output'); },
   onError(e) {
     console.error(e);
     out(`<span class="err">Runtime xatosi: ${esc(String(e?.message || e))}</span>\n`);
-    running = false;
-    pinState.clear();
-    updateRunState();
+    stopDevice();
     showTab('output');
   },
 });
-
 function startDevice(factory) {
   runtime.stop();
   runtime.board = board;
   pinState.clear();
   sketchBaud = 0;
   serialLine = null;
-  serialAppend(`\n`, 'sys');
   running = true;
-  updateRunState();
+  startedAt = performance.now();
+  $('#simTime').classList.add('live');
   runtime.start(factory);
 }
 function stopDevice(msg) {
   runtime.stop();
   pinState.clear();
   running = false;
-  updateRunState();
+  $('#simTime').classList.remove('live');
   if (msg) out(`<span class="dim">${esc(msg)}</span>\n`);
 }
 
@@ -442,7 +507,7 @@ const BAUDS = [300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 74880, 115200, 
 const baudSel = $('#baud');
 baudSel.innerHTML = BAUDS.map((b) => `<option value="${b}">${b} baud</option>`).join('');
 baudSel.value = String(store.get('baud', 9600));
-baudSel.onchange = () => store.set('baud', +baudSel.value);
+baudSel.onchange = () => { store.set('baud', +baudSel.value); serialWrite.warned = false; };
 let sketchBaud = 0;
 let autoscroll = true;
 let timestamps = false;
@@ -453,15 +518,13 @@ $('#timestamps').onclick = (e) => { timestamps = !timestamps; e.currentTarget.cl
 $('#btnClear').onclick = () => {
   if (activeTab() === 'serial') { serialOut.innerHTML = ''; serialLine = null; lineCount = 0; } else clearOutput();
 };
-
-const GARBAGE = '\uFFFDÿ¿þ⸮¤øÐ×åñ¢';
+const GARBAGE = '�ÿ¿þ⸮¤øÐ×åñ¢';
 function garble(text) {
   let s = '';
   for (let i = 0; i < text.length; i++) {
     const c = text.charCodeAt(i);
     if (c === 10) { s += '\n'; continue; }
-    if (c === 13) continue;
-    if ((c * 7 + i) % 3 === 0) continue;
+    if (c === 13 || (c * 7 + i) % 3 === 0) continue;
     s += GARBAGE[(c * 31 + sketchBaud + +baudSel.value) % GARBAGE.length];
   }
   return s;
@@ -471,10 +534,9 @@ function stamp() {
   const p = (n, w = 2) => String(n).padStart(w, '0');
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)} -> `;
 }
-function newLine(cls) {
+function newLine() {
   $('.serial-empty', serialOut)?.remove();
   serialLine = document.createElement('div');
-  if (cls) serialLine.className = cls;
   if (timestamps) {
     const ts = document.createElement('span');
     ts.className = 'ts';
@@ -483,17 +545,15 @@ function newLine(cls) {
   }
   serialLine.appendChild(document.createTextNode(''));
   serialOut.appendChild(serialLine);
-  lineCount++;
-  if (lineCount > 1500) { serialOut.firstChild.remove(); lineCount--; }
+  if (++lineCount > 1500) { serialOut.firstChild.remove(); lineCount--; }
 }
-function serialAppend(text, cls) {
-  if (cls === 'sys') { serialLine = null; return; }
+function serialAppend(text) {
   const parts = text.split('\n');
   parts.forEach((part, i) => {
     if (i > 0) serialLine = null;
     const clean = part.replace(/\r/g, '');
     if (!clean && i === parts.length - 1) return;
-    if (!serialLine) newLine(cls);
+    if (!serialLine) newLine();
     serialLine.lastChild.textContent += clean;
   });
   if (autoscroll) serialOut.scrollTop = serialOut.scrollHeight;
@@ -504,15 +564,14 @@ function serialWrite(text) {
   flagTab('serial');
   if (mismatch && !serialWrite.warned) {
     serialWrite.warned = true;
-    out(`<span class="diag">⚠ Serial Monitor tezligi (${baudSel.value} baud) sketchdagi Serial.begin(${sketchBaud}) bilan mos emas — shuning uchun matn buzuq chiqyapti. Pastdagi baud tanlovini ${sketchBaud} ga o‘zgartiring.</span>`);
+    out(`<span class="diag">Serial Monitor tezligi (${baudSel.value} baud) sketchdagi Serial.begin(${sketchBaud}) bilan mos emas — shuning uchun matn buzuq chiqyapti. Baud tanlovini ${sketchBaud} ga o‘zgartiring.</span>`);
     flagTab('output');
   }
 }
-baudSel.addEventListener('change', () => { serialWrite.warned = false; });
 $('#serialInput').addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   const input = e.currentTarget;
-  if (!running) { out('<span class="dim">Qurilma ishlamayapti — avval kodni yuklang.</span>\n'); flagTab('output'); return; }
+  if (!running) { out('<span class="dim">Avval kodni yuklang (▶).</span>\n'); flagTab('output'); return; }
   const le = $('#lineEnding').value.replace('\\n', '\n').replace('\\r', '\r');
   runtime.feed(input.value + le);
   input.value = '';
@@ -520,6 +579,5 @@ $('#serialInput').addEventListener('keydown', (e) => {
 
 // ---------------------------------------------------------------- initial state
 renderSensors();
-out(`<span class="dim">NAFAS virtual laboratoriyasi tayyor.\n\n</span>1) Kodni yozing yoki <b>Misollar</b>dan tanlang.\n2) <span class="ok">✓ Verify</span> — xatolarni tekshiradi (Ctrl+R).\n3) <span class="ok">→ Upload</span> — virtual qurilmaga yuklaydi (Ctrl+U).\n4) Pastdagi <b>Equipments</b> bilan isitkich yoki gaz sizishini yoqing.\n`);
-serialOut.innerHTML = '<div class="serial-empty">Serial Monitor: kod yuklangach, Serial.print() natijalari shu yerda chiqadi.</div>';
-if (store.get('dirty', false)) $('#dirtyDot').classList.add('dirty');
+out('<span class="dim">Ctrl+R — Verify · Ctrl+U — Upload · Ctrl+S — saqlash\n</span>');
+serialOut.innerHTML = '<div class="serial-empty">▶ bosilgach, Serial.print() natijalari shu yerda chiqadi.</div>';

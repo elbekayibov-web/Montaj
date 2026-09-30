@@ -18,7 +18,7 @@ export const BOARDS = {
     analogNames: { A0: 14, A1: 15, A2: 16, A3: 17, A4: 18, A5: 19 },
     pwmPins: [3, 5, 6, 9, 10, 11],
     ledBuiltin: 13,
-    wiring: { propane: 14, methane: 15, lm35: 16, dht: 2, buzzer: 8, led: 13 },
+    wiring: { propane: 14, methane: 15, dht: 16, buzzer: 8, led: 13, pir: 10, button: 4 },
   },
   nano: {
     id: 'nano',
@@ -35,7 +35,7 @@ export const BOARDS = {
     analogNames: { A0: 14, A1: 15, A2: 16, A3: 17, A4: 18, A5: 19, A6: 20, A7: 21 },
     pwmPins: [3, 5, 6, 9, 10, 11],
     ledBuiltin: 13,
-    wiring: { propane: 14, methane: 15, lm35: 16, dht: 2, buzzer: 8, led: 13 },
+    wiring: { propane: 14, methane: 15, dht: 16, buzzer: 8, led: 13, pir: 10, button: 4 },
   },
   esp32: {
     id: 'esp32',
@@ -52,7 +52,7 @@ export const BOARDS = {
     analogNames: { A0: 36, A3: 39, A4: 32, A5: 33, A6: 34, A7: 35 },
     pwmPins: null, // every output pin can do PWM via LEDC
     ledBuiltin: 2,
-    wiring: { propane: 34, methane: 35, lm35: 32, dht: 4, buzzer: 25, led: 2 },
+    wiring: { propane: 34, methane: 35, dht: 4, buzzer: 25, led: 2, pir: 27, button: 0 },
   },
 };
 
@@ -64,10 +64,11 @@ export function pinLabel(board, pin) {
 }
 
 export const WIRING_INFO = [
-  { key: 'propane', part: 'MQ-2', role: 'Propan sensori (analog)', color: 'propane' },
-  { key: 'methane', part: 'MQ-4', role: 'Metan sensori (analog)', color: 'methane' },
-  { key: 'lm35', part: 'LM35', role: 'Harorat sensori (analog, 10 mV/°C)', color: 'temp' },
-  { key: 'dht', part: 'DHT22', role: 'Harorat + namlik (raqamli)', color: 'temp' },
-  { key: 'buzzer', part: 'Buzzer', role: 'Faol buzzer (HIGH = ovoz)', color: 'alarm' },
-  { key: 'led', part: 'LED', role: 'Qurilmadagi signal chirog‘i', color: 'alarm' },
+  { key: 'propane', part: 'MQ-2', role: 'Propan sensori (analog)' },
+  { key: 'methane', part: 'MQ-4', role: 'Metan sensori (analog)' },
+  { key: 'dht', part: 'DHT22', role: 'Harorat + namlik (raqamli)' },
+  { key: 'buzzer', part: 'Buzzer', role: 'Faol buzzer (HIGH = ovoz)' },
+  { key: 'led', part: 'LED', role: 'Qizil signal chirog‘i' },
+  { key: 'pir', part: 'HC-SR501', role: 'Harakat sensori (PIR)' },
+  { key: 'button', part: 'Tugma', role: 'Tugma → GND (INPUT_PULLUP)' },
 ];
