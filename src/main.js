@@ -237,11 +237,23 @@ applyBoard();
 const menu = $('#examplesMenu');
 menu.innerHTML = EXAMPLES.map((e) => `<button data-ex="${e.id}"><b>${e.title}</b><small>${e.note}</small></button>`).join('');
 $('#btnExamples').onclick = (e) => { e.stopPropagation(); menu.classList.toggle('open'); };
-document.addEventListener('click', () => menu.classList.remove('open'));
+menu.addEventListener('click', (e) => e.stopPropagation());
+function resetMenuConfirm() {
+  for (const x of $$('button.confirm', menu)) { x.classList.remove('confirm'); $('small', x).textContent = $('small', x).dataset.note; }
+}
+document.addEventListener('click', () => { menu.classList.remove('open'); resetMenuConfirm(); });
 for (const b of $$('button', menu)) {
   b.onclick = () => {
     const ex = EXAMPLES.find((x) => x.id === b.dataset.ex);
-    if (dirtyFromExample && !confirm('Joriy kod o‘zgartirilgan. Misol bilan almashtirilsinmi?')) return;
+    // Two-step confirm inside the menu instead of window.confirm().
+    if (dirtyFromExample && !b.classList.contains('confirm')) {
+      $$('button', menu).forEach((x) => x.classList.remove('confirm'));
+      b.classList.add('confirm');
+      $('small', b).dataset.note = $('small', b).textContent;
+      $('small', b).textContent = 'Kodingiz o‘zgargan. Almashtirish uchun yana bosing.';
+      return;
+    }
+    b.classList.remove('confirm');
     currentExample = ex.id;
     fileName = ex.file;
     loadCode(exampleCode(ex, board));
@@ -252,6 +264,7 @@ for (const b of $$('button', menu)) {
     $('#fileName').textContent = fileName;
     $('#dirtyDot').classList.remove('dirty');
     editor.clearProblems();
+    menu.classList.remove('open');
   };
 }
 
@@ -441,7 +454,7 @@ $('#btnClear').onclick = () => {
   if (activeTab() === 'serial') { serialOut.innerHTML = ''; serialLine = null; lineCount = 0; } else clearOutput();
 };
 
-const GARBAGE = '�ÿ¿þ⸮¤øÐ×åñ¢';
+const GARBAGE = '\uFFFDÿ¿þ⸮¤øÐ×åñ¢';
 function garble(text) {
   let s = '';
   for (let i = 0; i < text.length; i++) {
