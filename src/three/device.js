@@ -57,11 +57,11 @@ export function createDevice() {
   grille.position.z = 0.322;
   root.add(grille);
 
-  const ringMat = new THREE.MeshStandardMaterial({ color: 0x0f1a1c, emissive: 0xc6f432, emissiveIntensity: 0, roughness: 0.3 });
+  const ringMat = new THREE.MeshStandardMaterial({ color: 0x0f1a1c, emissive: 0x5eeaff, emissiveIntensity: 0, roughness: 0.3 });
   const ring = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.016, 12, 96), ringMat);
   ring.position.z = 0.323;
   root.add(ring);
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0xc6f432, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture(), color: 0x5eeaff, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
   glow.scale.set(1.5, 1.5, 1);
   glow.position.z = 0.4;
   root.add(glow);
@@ -77,7 +77,7 @@ export function createDevice() {
   }
 
   const red = new THREE.Color(0xff3b3b);
-  const teal = new THREE.Color(0xb8f03a);
+  const teal = new THREE.Color(0x5eeaff);
   root.userData = {
     hit: body,
     // mode: 'off' | 'run' | 'alarm'; k = 0..1 brightness

@@ -47,10 +47,48 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
-  // The night sky is the scene background itself: it sits at infinity, so the
-  // view through the window stays correct from every camera angle.
-  scene.background = TX.nightSkyDome();
-  scene.backgroundIntensity = 1;
+  // Soft aurora drifting around the house. It lives on a sphere drawn at
+  // infinite depth, so it reads as far-away light from every camera angle.
+  scene.background = new THREE.Color(0x010203);
+  const auroraMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 } },
+    side: THREE.BackSide,
+    depthWrite: false,
+    depthTest: false,
+    vertexShader: `
+      varying vec3 vDir;
+      void main() {
+        vDir = position;
+        vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        gl_Position = p.xyww;
+      }`,
+    fragmentShader: `
+      uniform float uTime;
+      varying vec3 vDir;
+      vec3 ribbon(float az, float el, float k, vec3 color) {
+        float t = uTime;
+        float center = -0.34 + k * 0.13 + 0.13 * sin(az * 1.4 + t * 0.045 + k * 2.1) + 0.06 * sin(az * 3.3 - t * 0.06 + k);
+        float width = 0.035 + 0.02 * sin(az * 2.1 + t * 0.03 + k * 1.7);
+        float band = exp(-pow((el - center) / width, 2.0));
+        float folds = 0.55 + 0.45 * sin(az * 7.0 + el * 5.0 + t * 0.25 + k * 3.0);
+        float fade = 0.6 + 0.4 * sin(t * 0.12 + k * 2.4);
+        return color * band * folds * fade;
+      }
+      void main() {
+        vec3 d = normalize(vDir);
+        float az = atan(d.z, d.x);
+        float el = d.y;
+        vec3 col = vec3(0.003, 0.005, 0.01);
+        col += ribbon(az, el, 0.0, vec3(0.10, 0.20, 0.95)) * 0.16;
+        col += ribbon(az + 1.3, el, 1.0, vec3(0.30, 0.14, 0.85)) * 0.1;
+        col += ribbon(az - 0.8, el, 2.0, vec3(0.02, 0.55, 0.62)) * 0.11;
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+  const aurora = new THREE.Mesh(new THREE.SphereGeometry(60, 64, 32), auroraMat);
+  aurora.renderOrder = -10;
+  aurora.frustumCulled = false;
+  scene.add(aurora);
   new EXRLoader().load(apartmentHDR, (tex) => {
     const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromEquirectangular(tex).texture;
@@ -190,10 +228,10 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     g.computeVertexNormals();
     return g;
   };
-  for (const cx of [win.x0 - 0.22, win.x1 + 0.22]) {
+  for (const cx of [win.x0 - 0.44, win.x1 + 0.44]) {
     scene.add(at(mesh(curtainGeo(), curtainMat), cx, 1.39, Z0 + 0.16));
   }
-  scene.add(at(cyl(0.015, 0.015, ww + 1.2, M.brass, 12), (win.x0 + win.x1) / 2, 2.76, Z0 + 0.16).rotateZ(Math.PI / 2));
+  scene.add(at(cyl(0.015, 0.015, ww + 1.7, M.brass, 12), (win.x0 + win.x1) / 2, 2.76, Z0 + 0.16).rotateZ(Math.PI / 2));
 
   // ---------- radiator (heater) ----------
   const radMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f0, roughness: 0.35, emissive: 0xff4a12, emissiveIntensity: 0 });
@@ -581,13 +619,13 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     const h = 360;
     const grd = tctx.createLinearGradient(0, 0, w, h);
     grd.addColorStop(0, '#050606');
-    grd.addColorStop(1, '#1a1d10');
+    grd.addColorStop(1, '#06163a');
     tctx.fillStyle = grd;
     tctx.fillRect(0, 0, w, h);
     tctx.globalAlpha = 0.5;
     for (let i = 0; i < 3; i++) {
       tctx.beginPath();
-      tctx.strokeStyle = ['#c6f432', '#ff6a1f', '#9b7bff'][i];
+      tctx.strokeStyle = ['#5eeaff', '#3b6bff', '#7a5cff'][i];
       tctx.lineWidth = 3;
       for (let x = 0; x <= w; x += 8) {
         const y = h * 0.66 + Math.sin(x / 70 + t * (0.5 + i * 0.2) + i) * (20 + i * 8);
@@ -702,6 +740,7 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     lastNow = now;
     elapsed += dt;
     const t = elapsed;
+    auroraMat.uniforms.uTime.value = t;
     if (tween) {
       const u = Math.min(1, (performance.now() - tween.start) / 1000 / tween.dur);
       const k = THREE.MathUtils.smootherstep(u, 0, 1);
@@ -719,7 +758,7 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     warm.intensity = hp * 4;
 
     windowOpen += ((state.window ? 1 : 0) - windowOpen) * Math.min(1, dt * 3);
-    for (const s of sashes) s.pivot.rotation.y = -s.dir * windowOpen * 1.1;
+    for (const s of sashes) s.pivot.rotation.y = -s.dir * windowOpen * 1.5;
 
     stepGas(propaneGas, dt, 'propane', 0.08 + Math.min(1, state.propane / 1200) * 0.3, state.propaneLeak ? 40 : 0, propaneSource, state.window);
     stepGas(methaneGas, dt, 'methane', 0.08 + Math.min(1, state.methane / 1200) * 0.3, state.methaneLeak ? 40 : 0, methaneSource, state.window);

@@ -7,6 +7,7 @@ import { EXAMPLES, exampleCode } from './sim/examples.js';
 import { createEditor } from './ui/editor.js';
 import { Buzzer } from './ui/audio.js';
 import { createCircuit } from './ui/circuit.js';
+import { icon, glyph } from './ui/icons.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -28,7 +29,7 @@ let startedAt = 0;
 const room = createRoom($('#roomCanvas'), {
   onDeviceClick: () => {
     $('#circuit').scrollIntoView({ behavior: 'smooth', block: 'center' });
-    $('#circuit').animate([{ boxShadow: 'inset 0 0 0 2px #c6f432' }, { boxShadow: 'inset 0 0 0 2px transparent' }], { duration: 1600, delay: 500 });
+    $('#circuit').animate([{ boxShadow: 'inset 0 0 0 2px #5eeaff' }, { boxShadow: 'inset 0 0 0 2px transparent' }], { duration: 1600, delay: 500 });
   },
 });
 $('#focusDevice').onclick = () => room.focusDevice();
@@ -81,55 +82,43 @@ function ledLevel() {
   return st.mode === 1 ? 1 : 0.12; // no pinMode → dim through the pull-up
 }
 
-// ---------------------------------------------------------------- glow gauges
-const GAUGES = {
-  temperature: { min: 15, max: 80, over: (v) => v > 40, fmt: (v) => v.toFixed(1) },
-  propane: { min: 0, max: 1500, over: (v) => v > 700, fmt: (v) => String(Math.round(v)) },
-  methane: { min: 0, max: 1500, over: (v) => v > 700, fmt: (v) => String(Math.round(v)) },
+// ---------------------------------------------------------------- reading tiles
+for (const el of $$('[data-icon]')) el.innerHTML = icon(el.dataset.icon);
+for (const el of $$('[data-glyph]')) el.innerHTML = glyph(el.dataset.glyph, el.dataset.glyph);
+const TILES = {
+  temperature: { min: 18, max: 70, over: (v) => v > 40, fmt: (v) => v.toFixed(1), sub: () => `Humidity ${Math.round(world.humidity)}%` },
+  propane: { min: 0, max: 1200, over: (v) => v > 700, fmt: (v) => String(Math.round(v)), sub: (v) => gasNote(v, 'propane') },
+  methane: { min: 0, max: 1200, over: (v) => v > 700, fmt: (v) => String(Math.round(v)), sub: (v) => gasNote(v, 'methane') },
 };
-const TICKS = 60;
-for (const [key, g] of Object.entries(GAUGES)) {
-  const el = $(`.gauge[data-m="${key}"]`);
-  const svg = $('.ticks', el);
-  g.el = el;
-  g.val = $('[data-v]', el);
-  g.lines = [];
-  for (let i = 0; i < TICKS; i++) {
-    // ticks run clockwise from the bottom-left, leaving a gap at the bottom
-    const a = (Math.PI * 0.75) + (i / (TICKS - 1)) * Math.PI * 1.5;
-    const major = i % 5 === 0;
-    const r1 = major ? 86 : 89;
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', 100 + Math.cos(a) * r1);
-    line.setAttribute('y1', 100 + Math.sin(a) * r1);
-    line.setAttribute('x2', 100 + Math.cos(a) * 96);
-    line.setAttribute('y2', 100 + Math.sin(a) * 96);
-    if (major) line.classList.add('major');
-    svg.appendChild(line);
-    g.lines.push(line);
-  }
-  g.shown = null;
-  g.lit = -1;
+function gasNote(v, key) {
+  if (v > 700) return 'Dangerous level';
+  if (v > 150) return `Rising · ADC ${adcFor(key)}`;
+  return `Clean air · ADC ${adcFor(key)}`;
 }
+for (const [key, t] of Object.entries(TILES)) {
+  t.el = $(`.tile[data-m="${key}"]`);
+  t.val = $('[data-v]', t.el);
+  t.subEl = $('[data-sub]', t.el);
+  t.shown = null;
+  t.subAcc = 1;
+}
+function renderTiles(dt) {
+  for (const [key, t] of Object.entries(TILES)) {
+    const v = world[key];
+    t.shown = t.shown == null ? v : t.shown + (v - t.shown) * Math.min(1, dt * 5);
+    const lv = Math.max(0, Math.min(1, (t.shown - t.min) / (t.max - t.min)));
+    t.el.style.setProperty('--lv', lv.toFixed(3));
+    t.val.textContent = t.fmt(t.shown);
+    t.el.classList.toggle('over', t.over(v));
+    t.subAcc += dt;
+    if (t.subAcc > 0.3) { t.subAcc = 0; t.subEl.textContent = t.sub(v); }
+  }
+}
+
 function adcFor(key) {
   const max = 2 ** board.adcBits - 1;
   if (key === 'propane') return Math.round((mqVoltage(world.propane + 0.12 * world.methane, 2600) / 5) * max);
   return Math.round((mqVoltage(world.methane + 0.1 * world.propane, 3400) / 5) * max);
-}
-function renderGauges(dt) {
-  for (const [key, g] of Object.entries(GAUGES)) {
-    const v = world[key];
-    g.shown = g.shown == null ? v : g.shown + (v - g.shown) * Math.min(1, dt * 5);
-    const lv = Math.max(0, Math.min(1, (g.shown - g.min) / (g.max - g.min)));
-    g.el.style.setProperty('--lv', lv.toFixed(3));
-    g.val.textContent = g.fmt(g.shown);
-    const lit = Math.round(lv * TICKS);
-    if (lit !== g.lit) {
-      g.lines.forEach((l, i) => l.classList.toggle('on', i < lit));
-      g.lit = lit;
-    }
-    g.el.classList.toggle('over', g.over(v));
-  }
 }
 
 // ---------------------------------------------------------------- circuit
@@ -167,7 +156,7 @@ function loop(now) {
     const ss = String(Math.floor(ms / 1000) % 60).padStart(2, '0');
     $('#simTime').textContent = `${mm}:${ss}.${String(ms % 1000).padStart(3, '0')}`;
   }
-  renderGauges(dt);
+  renderTiles(dt);
 }
 requestAnimationFrame(loop);
 
@@ -287,7 +276,7 @@ function guarded(id, action) {
 document.addEventListener('click', (e) => {
   if (confirming && !e.target.closest('.file-item')) { confirming = null; renderExamples(); renderRecent(); }
 });
-const FILE_ICON = '<svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /></svg>';
+const FILE_ICON = icon('folder');
 function renderExamples() {
   $('#examplesList').innerHTML = EXAMPLES.map((e) => {
     const cur = !dirty && currentExample === e.id;

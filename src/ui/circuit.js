@@ -118,7 +118,7 @@ export function createCircuit(host, { onButton } = {}) {
     const y = 20;
     const g = el('g', { class: 'part', transform: `translate(${x},${y})`, filter: 'url(#soft)' }, gParts);
     const waves = el('g', { class: 'bz-waves' }, g);
-    for (let i = 0; i < 3; i++) el('path', { d: `M${50 + i * 8} ${6 - i * 2} q${10 + i * 3} ${14 + i * 2} 0 ${28 + i * 4}`, fill: 'none', stroke: '#c6f432', 'stroke-width': 2, 'stroke-linecap': 'round', style: `animation-delay:${i * 0.12}s` }, waves);
+    for (let i = 0; i < 3; i++) el('path', { d: `M${50 + i * 8} ${6 - i * 2} q${10 + i * 3} ${14 + i * 2} 0 ${28 + i * 4}`, fill: 'none', stroke: '#5eeaff', 'stroke-width': 2, 'stroke-linecap': 'round', style: `animation-delay:${i * 0.12}s` }, waves);
     el('circle', { cx: 24, cy: 22, r: 22, fill: '#1c1f22', stroke: '#33393d', 'stroke-width': 2 }, g);
     el('circle', { cx: 24, cy: 22, r: 5, fill: '#0b0d0e' }, g);
     label(g, 24, 26, '', 'c-mark');
@@ -133,7 +133,7 @@ export function createCircuit(host, { onButton } = {}) {
     const y = 132;
     const g = el('g', { class: 'part', transform: `translate(${x},${y})`, filter: 'url(#soft)' }, gParts);
     el('rect', { x: 0, y: 0, width: 92, height: 70, rx: 5, fill: '#1c4f86' }, g);
-    const glow = el('circle', { cx: 46, cy: 32, r: 32, fill: '#c6f432', filter: 'url(#glow)', opacity: 0 }, g);
+    const glow = el('circle', { cx: 46, cy: 32, r: 32, fill: '#5eeaff', filter: 'url(#glow)', opacity: 0 }, g);
     el('circle', { cx: 46, cy: 32, r: 26, fill: 'url(#dome)' }, g);
     for (let r = 0; r < 3; r++) el('circle', { cx: 46, cy: 32, r: 8 + r * 7, fill: 'none', stroke: '#b4bcc2', 'stroke-width': 0.8 }, g);
     for (const [i, t] of ['+', 'D', '−'].entries()) { label(g, 30 + i * 16, 68, t, 'c-pin'); pinDot(g, 30 + i * 16, 70); }
