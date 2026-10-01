@@ -47,7 +47,10 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a1114);
+  // The night sky is the scene background itself: it sits at infinity, so the
+  // view through the window stays correct from every camera angle.
+  scene.background = TX.nightSkyDome();
+  scene.backgroundIntensity = 1;
   new EXRLoader().load(apartmentHDR, (tex) => {
     const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromEquirectangular(tex).texture;
@@ -155,8 +158,6 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
   // ---------- window with curtains and a night city ----------
   const ww = win.x1 - win.x0;
   const wh = win.y1 - win.y0;
-  const sky = new THREE.Mesh(new THREE.PlaneGeometry(ww + 1.2, wh + 0.8), new THREE.MeshBasicMaterial({ map: TX.nightSky(), toneMapped: false }));
-  scene.add(at(sky, (win.x0 + win.x1) / 2, (win.y0 + win.y1) / 2 + 0.1, Z0 - T - 0.6));
   for (const [fw, fh, fx, fy] of [[ww + 0.1, 0.07, (win.x0 + win.x1) / 2, win.y1], [ww + 0.1, 0.07, (win.x0 + win.x1) / 2, win.y0], [0.07, wh, win.x0, (win.y0 + win.y1) / 2], [0.07, wh, win.x1, (win.y0 + win.y1) / 2]]) {
     scene.add(at(box(fw, fh, T + 0.04, M.trim), fx, fy, Z0 - T / 2));
   }
@@ -265,21 +266,36 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
   const rugMesh = mesh(new THREE.BoxGeometry(3.8, 0.015, 2.8), M.rug, { cast: false });
   scene.add(at(rugMesh, tvX + 0.3, 0.008, -0.9));
 
-  const sofa = new THREE.Group();
-  sofa.add(at(rbox(2.5, 0.36, 0.98, 0.06, M.sofa, 4), 0, 0.28, 0));
-  sofa.add(at(rbox(2.5, 0.52, 0.24, 0.1, M.sofa, 5), 0, 0.64, 0.37));
-  for (const sx of [-1.14, 1.14]) sofa.add(at(rbox(0.24, 0.5, 0.98, 0.1, M.sofa, 5), sx, 0.36, 0));
-  for (const sx of [-0.51, 0.51]) {
-    sofa.add(at(rbox(1.0, 0.18, 0.76, 0.08, M.sofa, 5), sx, 0.54, -0.08));
-    const bc = rbox(0.98, 0.5, 0.22, 0.1, M.sofa, 5);
-    bc.rotation.x = -0.14;
-    sofa.add(at(bc, sx, 0.86, 0.2));
+  // One furniture family: the same fabric, cushions and tapered walnut legs
+  // for the sofa, the armchair and the dining chairs.
+  function seating(width, seats) {
+    const g = new THREE.Group();
+    const armW = 0.2;
+    const inner = width - armW * 2;
+    g.add(at(rbox(width, 0.3, 0.92, 0.05, M.sofa, 4), 0, 0.3, 0));
+    g.add(at(rbox(width, 0.46, 0.2, 0.08, M.sofa, 5), 0, 0.66, 0.36));
+    for (const sx of [-1, 1]) g.add(at(rbox(armW, 0.36, 0.92, 0.08, M.sofa, 5), sx * (width / 2 - armW / 2), 0.42, 0));
+    const cw = inner / seats;
+    for (let i = 0; i < seats; i++) {
+      const cx = -inner / 2 + cw * (i + 0.5);
+      g.add(at(rbox(cw - 0.02, 0.17, 0.72, 0.07, M.sofa, 5), cx, 0.53, -0.08));
+      const back = rbox(cw - 0.03, 0.44, 0.18, 0.08, M.sofa, 5);
+      back.rotation.x = -0.12;
+      g.add(at(back, cx, 0.82, 0.21));
+    }
+    const legH = 0.15;
+    for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const leg = cyl(0.022, 0.014, legH, M.walnut, 12);
+      leg.rotation.z = lx * 0.12;
+      leg.rotation.x = -lz * 0.12;
+      g.add(at(leg, lx * (width / 2 - 0.1), legH / 2, lz * 0.36));
+    }
+    return g;
   }
-  const p1 = rbox(0.42, 0.4, 0.13, 0.08, M.pillowA, 5); p1.rotation.set(-0.25, 0.25, 0.1); sofa.add(at(p1, -0.8, 0.86, 0.06));
-  const p2 = rbox(0.4, 0.38, 0.13, 0.08, M.pillowB, 5); p2.rotation.set(-0.25, -0.3, -0.12); sofa.add(at(p2, 0.82, 0.85, 0.06));
-  const throwB = rbox(0.5, 0.03, 0.7, 0.012, M.pillowB, 2); throwB.rotation.z = 0.05; sofa.add(at(throwB, 0.95, 0.65, -0.1));
-  for (const [lx, lz] of [[-1.15, -0.4], [1.15, -0.4], [-1.15, 0.4], [1.15, 0.4]]) sofa.add(at(cyl(0.025, 0.018, 0.1, M.black, 10), lx, 0.05, lz));
-  sofa.rotation.y = Math.PI;
+  const sofa = seating(2.5, 2);
+  const p1 = rbox(0.42, 0.4, 0.13, 0.08, M.pillowA, 5); p1.rotation.set(-0.25, 0.25, 0.1); sofa.add(at(p1, -0.78, 0.82, 0.08));
+  const p2 = rbox(0.4, 0.38, 0.13, 0.08, M.pillowB, 5); p2.rotation.set(-0.25, -0.3, -0.12); sofa.add(at(p2, 0.8, 0.81, 0.08));
+  // seat faces -z: towards the TV
   at(sofa, tvX + 0.3, 0, 0.55);
   scene.add(sofa);
 
@@ -293,36 +309,19 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
   scene.add(table);
   addFlowers(scene, new THREE.Vector3(tvX + 0.55, 0.445, -0.95), 0);
 
-  const chair = new THREE.Group();
-  chair.add(at(rbox(0.85, 0.3, 0.8, 0.08, M.chair, 4), 0, 0.32, 0));
-  chair.add(at(rbox(0.85, 0.55, 0.18, 0.08, M.chair, 4), 0, 0.68, 0.32));
-  for (const sx of [-0.44, 0.44]) chair.add(at(rbox(0.12, 0.42, 0.8, 0.05, M.chair, 4), sx, 0.45, 0));
-  chair.add(at(rbox(0.72, 0.12, 0.62, 0.05, M.chair, 4), 0, 0.52, -0.05));
-  for (const [lx, lz] of [[-0.38, -0.34], [0.38, -0.34], [-0.38, 0.34], [0.38, 0.34]]) chair.add(at(cyl(0.02, 0.014, 0.18, M.walnut, 10), lx, 0.09, lz));
-  chair.rotation.y = -Math.PI / 2 - 0.45;
-  at(chair, tvX + 2.55, 0, -0.75);
+  const chair = seating(0.98, 1);
+  chair.add(at(rbox(0.36, 0.34, 0.12, 0.07, M.pillowB, 5).rotateX(-0.25), 0, 0.8, 0.1));
+  chair.rotation.y = 1.3;
+  at(chair, tvX + 2.55, 0, -0.85);
   scene.add(chair);
 
-  // arc floor lamp behind the sofa
-  const lampBase = new THREE.Vector3(X0 + 0.5, 0, 1.05);
-  scene.add(at(cyl(0.2, 0.22, 0.05, std(0xece8e1, { roughness: 0.3 }), 32), lampBase.x, 0.025, lampBase.z));
-  const arc = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(lampBase.x, 0.05, lampBase.z), new THREE.Vector3(lampBase.x + 0.05, 1.3, lampBase.z - 0.05),
-    new THREE.Vector3(lampBase.x + 0.6, 2.15, lampBase.z - 0.3), new THREE.Vector3(lampBase.x + 1.35, 2.05, lampBase.z - 0.55),
-  ]);
-  scene.add(mesh(new THREE.TubeGeometry(arc, 60, 0.012, 8), M.brass));
-  const shadeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.4, metalness: 0.5, side: THREE.DoubleSide });
-  const shade = mesh(new THREE.SphereGeometry(0.24, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), shadeMat);
-  const lampHead = new THREE.Vector3(lampBase.x + 1.35, 1.93, lampBase.z - 0.55);
-  scene.add(at(shade, lampHead.x, lampHead.y + 0.02, lampHead.z));
-  const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffd9a0, toneMapped: false }));
-  scene.add(at(bulb, lampHead.x, lampHead.y - 0.02, lampHead.z));
-  const lampLight = new THREE.PointLight(0xffb36b, 7, 0, 2);
-  lampLight.castShadow = true;
-  lampLight.shadow.mapSize.set(1024, 1024);
-  lampLight.shadow.bias = -0.002;
-  lampLight.shadow.radius = 6;
-  scene.add(at(lampLight, lampHead.x, lampHead.y - 0.12, lampHead.z));
+  // soft overhead light for the living area (no visible fixture)
+  const roomLight = new THREE.PointLight(0xffc690, 5.5, 0, 2);
+  roomLight.castShadow = true;
+  roomLight.shadow.mapSize.set(1024, 1024);
+  roomLight.shadow.bias = -0.002;
+  roomLight.shadow.radius = 8;
+  scene.add(at(roomLight, tvX + 0.6, H - 0.35, -0.2));
 
   // ---------- paintings on the accent wall with picture lights ----------
   function painting(tex, w, h, z, y) {
@@ -346,10 +345,11 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     scene.add(g);
     return g;
   }
-  const starryTex = TX.paintingTexture(TX.PAINTINGS.starry, () => TX.starryNight());
-  const adamTex = TX.paintingTexture(TX.PAINTINGS.adam, () => TX.wheatField());
-  painting(starryTex, 1.3, 1.03, 0.25, 1.7);
-  painting(adamTex, 1.75, 0.8, -1.95, 1.72);
+  // Both paintings use the same frame size; images are cover-cropped to fit.
+  const PW = 1.3;
+  const PH = 1.0;
+  painting(TX.paintingTexture(TX.PAINTINGS.starry, () => TX.starryNight(), PW / PH), PW, PH, 0.3, 1.7);
+  painting(TX.paintingTexture(TX.PAINTINGS.adam, () => TX.wheatField(), PW / PH), PW, PH, -1.8, 1.7);
 
   // ---------- plants ----------
   const bigPot = cyl(0.26, 0.2, 0.5, M.terracotta, 32);
@@ -368,9 +368,16 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
   dining.add(at(cyl(0.28, 0.3, 0.03, M.black, 32), 0, 0.015, 0));
   for (const a of [0.4, Math.PI + 0.4]) {
     const ch = new THREE.Group();
-    ch.add(at(rbox(0.42, 0.05, 0.42, 0.02, M.oak, 2), 0, 0.45, 0));
-    ch.add(at(rbox(0.42, 0.4, 0.04, 0.02, M.oak, 2), 0, 0.68, 0.2));
-    for (const [lx, lz] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) ch.add(at(cyl(0.015, 0.013, 0.44, M.black, 8), lx, 0.22, lz));
+    ch.add(at(rbox(0.46, 0.1, 0.46, 0.04, M.sofa, 4), 0, 0.47, 0));
+    const chBack = rbox(0.46, 0.42, 0.08, 0.04, M.sofa, 4);
+    chBack.rotation.x = -0.1;
+    ch.add(at(chBack, 0, 0.74, 0.2));
+    for (const [lx, lz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const leg = cyl(0.018, 0.012, 0.43, M.walnut, 10);
+      leg.rotation.z = lx * 0.08;
+      leg.rotation.x = -lz * 0.08;
+      ch.add(at(leg, lx * 0.18, 0.215, lz * 0.18));
+    }
     ch.rotation.y = a + Math.PI / 2;
     ch.position.set(Math.cos(a) * 0.75, 0, -Math.sin(a) * 0.75);
     dining.add(ch);
@@ -573,14 +580,14 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     const w = 640;
     const h = 360;
     const grd = tctx.createLinearGradient(0, 0, w, h);
-    grd.addColorStop(0, '#04161a');
-    grd.addColorStop(1, '#0b3a40');
+    grd.addColorStop(0, '#050606');
+    grd.addColorStop(1, '#1a1d10');
     tctx.fillStyle = grd;
     tctx.fillRect(0, 0, w, h);
     tctx.globalAlpha = 0.5;
     for (let i = 0; i < 3; i++) {
       tctx.beginPath();
-      tctx.strokeStyle = ['#2dd4bf', '#38bdf8', '#34d399'][i];
+      tctx.strokeStyle = ['#c6f432', '#ff6a1f', '#9b7bff'][i];
       tctx.lineWidth = 3;
       for (let x = 0; x <= w; x += 8) {
         const y = h * 0.66 + Math.sin(x / 70 + t * (0.5 + i * 0.2) + i) * (20 + i * 8);
@@ -594,13 +601,13 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     tctx.fillText(`${st.temperature.toFixed(1)}°`, 40, 86);
     tctx.font = '500 20px -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif';
     tctx.fillStyle = 'rgba(230,246,244,0.6)';
-    tctx.fillText(new Date().toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' }), 40, 120);
+    tctx.fillText(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), 40, 120);
     if (st.alarm) {
       tctx.fillStyle = `rgba(220,38,38,${0.75 + Math.sin(t * 10) * 0.2})`;
       tctx.fillRect(0, h - 64, w, 64);
       tctx.fillStyle = '#fff';
       tctx.font = '700 26px -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif';
-      tctx.fillText('NAFAS · XAVF', 40, h - 22);
+      tctx.fillText('NAFAS · ALERT', 40, h - 22);
     }
     tvTex.needsUpdate = true;
   }

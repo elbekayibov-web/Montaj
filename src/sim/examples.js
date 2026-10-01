@@ -1,49 +1,117 @@
-// Ready-made sketches. The first one reproduces the program from the
-// student's photos: three start-up beeps, reads the gas sensor, prints
-// "Gaz darajasi:" and alarms above 200.
+// Ready-made sketches. {{PIN}} placeholders are filled with the wiring of the
+// selected board (see exampleCode below).
 
 export const EXAMPLES = [
   {
+    id: 'nafas',
+    file: 'nafas_nano.ino',
+    title: 'NAFAS Nano monitor',
+    note: 'Beep-beep above 40 °C, alarm on gas',
+    code: `// NAFAS Nano — room safety monitor
+// DHT22 temperature, MQ-2 propane and MQ-4 methane sensors.
+#include <DHT.h>
+
+#define DHTPIN {{DHT}}
+#define PROPANE_PIN {{PROPAN}}
+#define METHANE_PIN {{METAN}}
+#define BUZZER {{BUZZER}}
+#define LED {{LED}}
+
+DHT dht(DHTPIN, DHT22);
+
+const float MAX_TEMP = 40.0;   // °C
+const int MAX_PROPANE = 200;   // raw sensor value
+const int MAX_METHANE = 220;
+
+void beep(int count, int ms) {
+  for (int i = 0; i < count; i++) {
+    tone(BUZZER, 2800);
+    delay(ms);
+    noTone(BUZZER);
+    delay(ms);
+  }
+}
+
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+  pinMode(BUZZER, OUTPUT);
+  pinMode(LED, OUTPUT);
+  beep(2, 80);
+  Serial.println("NAFAS Nano ready");
+}
+
+void loop() {
+  float t = dht.readTemperature();
+  int propane = analogRead(PROPANE_PIN);
+  int methane = analogRead(METHANE_PIN);
+
+  Serial.print("T=");
+  Serial.print(t, 1);
+  Serial.print("C  propane=");
+  Serial.print(propane);
+  Serial.print("  methane=");
+  Serial.println(methane);
+
+  bool gas = propane > MAX_PROPANE || methane > MAX_METHANE;
+
+  if (gas) {
+    Serial.println("DANGER: gas leak!");
+    digitalWrite(LED, HIGH);
+    beep(6, 70);              // fast alarm
+  } else if (t > MAX_TEMP) {
+    Serial.println("WARNING: too hot!");
+    digitalWrite(LED, HIGH);
+    beep(2, 90);              // beep-beep
+    delay(600);
+  } else {
+    digitalWrite(LED, LOW);
+    delay(1000);
+  }
+}
+`,
+  },
+  {
     id: 'gaz',
-    file: 'nafas_gaz.ino',
-    title: 'Gaz sensori (propan)',
-    note: 'Rasmdagi kod: 3 marta signal, gaz > 200 bo‘lsa xavf.',
-    code: `// NAFAS — gaz sizishini aniqlash
-// MQ-2 (propan) sensori {{PROPAN}} pinga, buzzer {{BUZZER}}-pinga ulangan.
+    file: 'gas_sensor.ino',
+    title: 'Gas sensor (photo sketch)',
+    note: '3 start-up beeps, alarm above 200',
+    code: `// NAFAS — gas leak detection
+// MQ-2 (propane) on {{PROPAN}}, buzzer on pin {{BUZZER}}.
 
 #define GAS_PIN {{PROPAN}}
 #define BUZZER {{BUZZER}}
 
-int chegara = 200;   // xavf chegarasi (sensor qiymati)
+int threshold = 200;   // raw sensor value
 
 void setup() {
   Serial.begin(9600);
   pinMode(BUZZER, OUTPUT);
 
-  // Ishga tushganda 3 marta qisqa signal
+  // three short beeps on start-up
   for (int i = 0; i < 3; i++) {
     digitalWrite(BUZZER, HIGH);
     delay(150);
     digitalWrite(BUZZER, LOW);
     delay(150);
   }
-  Serial.println("NAFAS tayyor!");
+  Serial.println("NAFAS ready!");
 }
 
 void loop() {
-  int gaz = analogRead(GAS_PIN);
+  int gas = analogRead(GAS_PIN);
 
-  Serial.print("Gaz darajasi: ");
-  Serial.println(gaz);
+  Serial.print("Gas level: ");
+  Serial.println(gas);
 
-  if (gaz > chegara) {
-    Serial.println("XAVF! Gaz sizib chiqmoqda!");
+  if (gas > threshold) {
+    Serial.println("DANGER! Gas leak!");
     digitalWrite(BUZZER, HIGH);
     delay(100);
     digitalWrite(BUZZER, LOW);
     delay(100);
   } else {
-    Serial.println("Xavfsiz");
+    Serial.println("Safe");
     digitalWrite(BUZZER, LOW);
     delay(500);
   }
@@ -52,11 +120,10 @@ void loop() {
   },
   {
     id: 'harorat',
-    file: 'nafas_harorat.ino',
-    title: 'Harorat 40°C (DHT22)',
-    note: 'Isitkichni yoqing — 40°C dan oshsa signal.',
-    code: `// NAFAS — harorat nazorati
-// DHT22 sensori {{DHT}} pinga ulangan.
+    file: 'temperature.ino',
+    title: 'Temperature 40 °C',
+    note: 'Turn the heater on and wait',
+    code: `// NAFAS — temperature watch (DHT22 on {{DHT}})
 #include <DHT.h>
 
 #define DHTPIN {{DHT}}
@@ -64,7 +131,7 @@ void loop() {
 #define LED {{LED}}
 
 DHT dht(DHTPIN, DHT22);
-float chegara = 40.0;   // °C
+float limit = 40.0;   // °C
 
 void setup() {
   Serial.begin(9600);
@@ -74,16 +141,18 @@ void setup() {
 }
 
 void loop() {
-  float harorat = dht.readTemperature();
+  float temperature = dht.readTemperature();
 
-  Serial.print("Harorat: ");
-  Serial.print(harorat, 1);
+  Serial.print("Temperature: ");
+  Serial.print(temperature, 1);
   Serial.println(" C");
 
-  if (harorat > chegara) {
-    Serial.println("DIQQAT! Harorat juda yuqori!");
+  if (temperature > limit) {
+    Serial.println("WARNING: temperature too high!");
     digitalWrite(LED, HIGH);
-    tone(BUZZER, 2000, 300);
+    tone(BUZZER, 2800, 120);   // beep
+    delay(220);
+    tone(BUZZER, 2800, 120);   // beep
   } else {
     digitalWrite(LED, LOW);
   }
@@ -92,175 +161,89 @@ void loop() {
 `,
   },
   {
-    id: 'harakat',
-    file: 'nafas_harakat.ino',
-    title: 'Harakat sensori + tugma',
-    note: 'PIR harakatni sezadi, tugma signalni o‘chiradi.',
-    code: `// Harakat sensori (HC-SR501) va signalni o'chirish tugmasi
-#define PIR {{PIR}}
-#define TUGMA {{BUTTON}}
+    id: 'tugma',
+    file: 'silence_button.ino',
+    title: 'Silence button',
+    note: 'Press the button in the circuit',
+    code: `// The alarm beeps while gas is detected; the button silences it.
+#define GAS_PIN {{PROPAN}}
+#define BUTTON {{BUTTON}}
 #define LED {{LED}}
 #define BUZZER {{BUZZER}}
 
-bool signalYoniq = false;
+bool muted = false;
 
 void setup() {
   Serial.begin(9600);
-  pinMode(PIR, INPUT);
-  pinMode(TUGMA, INPUT_PULLUP);
+  pinMode(BUTTON, INPUT_PULLUP);
   pinMode(LED, OUTPUT);
   pinMode(BUZZER, OUTPUT);
 }
 
 void loop() {
-  if (digitalRead(PIR) == HIGH && !signalYoniq) {
-    Serial.println("Xonada harakat bor!");
-    signalYoniq = true;
-  }
+  int gas = analogRead(GAS_PIN);
+  bool danger = gas > 200;
 
-  // Tugma bosilganda LOW bo'ladi (INPUT_PULLUP)
-  if (digitalRead(TUGMA) == LOW) {
-    Serial.println("Signal o'chirildi");
-    signalYoniq = false;
-    delay(300);
+  // pressed = LOW because of INPUT_PULLUP
+  if (digitalRead(BUTTON) == LOW && danger && !muted) {
+    muted = true;
+    Serial.println("Alarm silenced");
   }
+  if (!danger) muted = false;
 
-  digitalWrite(LED, signalYoniq ? HIGH : LOW);
-  digitalWrite(BUZZER, signalYoniq && (millis() / 250) % 2 ? HIGH : LOW);
+  digitalWrite(LED, danger ? HIGH : LOW);
+  digitalWrite(BUZZER, danger && !muted && (millis() / 200) % 2 ? HIGH : LOW);
   delay(20);
 }
 `,
   },
   {
-    id: 'toliq',
-    file: 'nafas_nano.ino',
-    title: 'To‘liq NAFAS (DHT22 + 2 gaz)',
-    note: 'Harorat, propan va metan — xavf darajalari bilan.',
-    code: `// NAFAS Nano — to'liq monitoring
-#include <DHT.h>
-
-#define DHTPIN {{DHT}}
-#define DHTTYPE DHT22
-#define PROPAN_PIN {{PROPAN}}
-#define METAN_PIN {{METAN}}
-#define BUZZER {{BUZZER}}
-#define LED {{LED}}
-
-DHT dht(DHTPIN, DHTTYPE);
-
-const float MAX_HARORAT = 40.0;
-const int MAX_PROPAN = 200;
-const int MAX_METAN = 220;
-
-unsigned long oldingiVaqt = 0;
-
-void signal(int soni, int davomiylik) {
-  for (int i = 0; i < soni; i++) {
-    digitalWrite(BUZZER, HIGH);
-    delay(davomiylik);
-    digitalWrite(BUZZER, LOW);
-    delay(davomiylik);
-  }
-}
-
-void setup() {
-  Serial.begin(9600);
-  dht.begin();
-  pinMode(BUZZER, OUTPUT);
-  pinMode(LED, OUTPUT);
-  signal(3, 120);
-  Serial.println("NAFAS Nano ishga tushdi");
-}
-
-void loop() {
-  if (millis() - oldingiVaqt < 1000) return;
-  oldingiVaqt = millis();
-
-  float t = dht.readTemperature();
-  float h = dht.readHumidity();
-  int propan = analogRead(PROPAN_PIN);
-  int metan = analogRead(METAN_PIN);
-
-  if (isnan(t)) {
-    Serial.println("DHT sensorini o'qib bo'lmadi!");
-    return;
-  }
-
-  Serial.print("T=");
-  Serial.print(t, 1);
-  Serial.print("C  H=");
-  Serial.print(h, 0);
-  Serial.print("%  Propan=");
-  Serial.print(propan);
-  Serial.print("  Metan=");
-  Serial.println(metan);
-
-  int xavf = 0;
-  if (t > MAX_HARORAT) xavf++;
-  if (propan > MAX_PROPAN) xavf++;
-  if (metan > MAX_METAN) xavf++;
-
-  if (xavf == 0) {
-    digitalWrite(LED, LOW);
-  } else if (xavf == 1) {
-    Serial.println(">> Ogohlantirish: 1 ta ko'rsatkich me'yordan yuqori");
-    digitalWrite(LED, HIGH);
-    signal(1, 200);
-  } else {
-    Serial.println(">> XAVF! Bir nechta ko'rsatkich me'yordan yuqori!");
-    digitalWrite(LED, HIGH);
-    signal(4, 80);
-  }
-}
-`,
-  },
-  {
     id: 'serial',
-    file: 'nafas_sozlash.ino',
-    title: 'Chegarani Serial orqali sozlash',
-    note: 'Serial Monitor’ga son yozing — yangi chegara bo‘ladi.',
-    code: `// Chegarani Serial Monitor orqali o'zgartirish
-// Monitor'ga masalan 300 yozib Enter bosing.
+    file: 'serial_threshold.ino',
+    title: 'Threshold over Serial',
+    note: 'Type a number in the Serial Monitor',
+    code: `// Change the alarm threshold from the Serial Monitor.
+// Type for example 300 and press Enter.
 
-int chegara = 200;
+int threshold = 200;
 
 void setup() {
   Serial.begin(9600);
   pinMode({{BUZZER}}, OUTPUT);
-  Serial.println("Yangi chegarani yozing:");
+  Serial.println("Type a new threshold:");
 }
 
 void loop() {
   if (Serial.available() > 0) {
-    int yangi = Serial.parseInt();
-    if (yangi > 0) {
-      chegara = yangi;
-      Serial.print("Chegara o'zgardi: ");
-      Serial.println(chegara);
+    int value = Serial.parseInt();
+    if (value > 0) {
+      threshold = value;
+      Serial.print("Threshold set to ");
+      Serial.println(threshold);
     }
     while (Serial.available()) Serial.read();
   }
 
-  int metan = analogRead({{METAN}});
-  Serial.print("Metan: ");
-  Serial.print(metan);
+  int methane = analogRead({{METAN}});
+  Serial.print("Methane: ");
+  Serial.print(methane);
   Serial.print(" / ");
-  Serial.println(chegara);
+  Serial.println(threshold);
 
-  digitalWrite({{BUZZER}}, metan > chegara ? HIGH : LOW);
+  digitalWrite({{BUZZER}}, methane > threshold ? HIGH : LOW);
   delay(700);
 }
 `,
   },
   {
     id: 'xato',
-    file: 'mantiqiy_xato.ino',
-    title: 'Mantiqiy xatoni toping',
-    note: 'Kod kompilyatsiya bo‘ladi, lekin noto‘g‘ri ishlaydi.',
-    code: `// Bu kod kompilyatsiyadan o'tadi, lekin 2 ta mantiqiy xatosi bor.
-// Gaz chiqqanda signal chalinishi kerak. Nima noto'g'ri?
+    file: 'find_the_bug.ino',
+    title: 'Find the logic bug',
+    note: 'Compiles, but behaves wrong',
+    code: `// This sketch compiles, but it has two logic bugs.
+// The buzzer should sound only when gas is detected. What is wrong?
 
-int chegara = 200;
+int threshold = 200;
 
 void setup() {
   Serial.begin(9600);
@@ -268,14 +251,14 @@ void setup() {
 }
 
 void loop() {
-  int gaz = analogRead({{PROPAN}});
-  Serial.print("Gaz: ");
-  Serial.println(gaz);
+  int gas = analogRead({{PROPAN}});
+  Serial.print("Gas: ");
+  Serial.println(gas);
 
-  if (gaz = chegara) {
+  if (gas = threshold) {
     digitalWrite({{BUZZER}}, HIGH);
   }
-  if (gaz < chegara) {
+  if (gas < threshold) {
     digitalWrite({{BUZZER}}, HIGH);
   }
   delay(500);

@@ -41,7 +41,7 @@ function labelToPin(label) {
 }
 
 export function createCircuit(host, { onButton } = {}) {
-  const svg = el('svg', { viewBox: '0 0 730 460', class: 'circuit-svg', role: 'img', 'aria-label': 'NAFAS qurilmasining ulanish sxemasi' });
+  const svg = el('svg', { viewBox: '0 0 730 460', class: 'circuit-svg', role: 'img', 'aria-label': 'NAFAS Nano wiring diagram' });
   host.appendChild(svg);
   const defs = el('defs', {}, svg);
   defs.innerHTML = `
@@ -118,7 +118,7 @@ export function createCircuit(host, { onButton } = {}) {
     const y = 20;
     const g = el('g', { class: 'part', transform: `translate(${x},${y})`, filter: 'url(#soft)' }, gParts);
     const waves = el('g', { class: 'bz-waves' }, g);
-    for (let i = 0; i < 3; i++) el('path', { d: `M${50 + i * 8} ${6 - i * 2} q${10 + i * 3} ${14 + i * 2} 0 ${28 + i * 4}`, fill: 'none', stroke: '#2dd4bf', 'stroke-width': 2, 'stroke-linecap': 'round', style: `animation-delay:${i * 0.12}s` }, waves);
+    for (let i = 0; i < 3; i++) el('path', { d: `M${50 + i * 8} ${6 - i * 2} q${10 + i * 3} ${14 + i * 2} 0 ${28 + i * 4}`, fill: 'none', stroke: '#c6f432', 'stroke-width': 2, 'stroke-linecap': 'round', style: `animation-delay:${i * 0.12}s` }, waves);
     el('circle', { cx: 24, cy: 22, r: 22, fill: '#1c1f22', stroke: '#33393d', 'stroke-width': 2 }, g);
     el('circle', { cx: 24, cy: 22, r: 5, fill: '#0b0d0e' }, g);
     label(g, 24, 26, '', 'c-mark');
@@ -133,7 +133,7 @@ export function createCircuit(host, { onButton } = {}) {
     const y = 132;
     const g = el('g', { class: 'part', transform: `translate(${x},${y})`, filter: 'url(#soft)' }, gParts);
     el('rect', { x: 0, y: 0, width: 92, height: 70, rx: 5, fill: '#1c4f86' }, g);
-    const glow = el('circle', { cx: 46, cy: 32, r: 32, fill: '#2dd4bf', filter: 'url(#glow)', opacity: 0 }, g);
+    const glow = el('circle', { cx: 46, cy: 32, r: 32, fill: '#c6f432', filter: 'url(#glow)', opacity: 0 }, g);
     el('circle', { cx: 46, cy: 32, r: 26, fill: 'url(#dome)' }, g);
     for (let r = 0; r < 3; r++) el('circle', { cx: 46, cy: 32, r: 8 + r * 7, fill: 'none', stroke: '#b4bcc2', 'stroke-width': 0.8 }, g);
     for (const [i, t] of ['+', 'D', '−'].entries()) { label(g, 30 + i * 16, 68, t, 'c-pin'); pinDot(g, 30 + i * 16, 70); }
@@ -148,7 +148,7 @@ export function createCircuit(host, { onButton } = {}) {
     el('rect', { x: 0, y: 0, width: 52, height: 44, rx: 4, fill: '#e6e8ea' }, g);
     const cap = el('circle', { cx: 26, cy: 22, r: 14, fill: '#1f8a3b', stroke: '#156b2c', 'stroke-width': 2 }, g);
     for (const [px, py] of [[-6, 10], [-6, 34], [52, 10], [52, 34]]) el('rect', { x: px, y: py - 2, width: 6, height: 4, fill: '#b9bec2' }, g);
-    label(g, 26, 66, 'Tugma', 'c-name');
+    label(g, 26, 66, 'Button · press', 'c-name');
     parts.button = { g, cap, pins: { OUT: [x + 58, y + 10], GND: [x + 58, y + 34] } };
     const press = (v) => (e) => {
       e.preventDefault();

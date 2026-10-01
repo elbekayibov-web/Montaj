@@ -48,31 +48,31 @@ test('all examples compile on every board', () => {
 
 test('gas example: safe vs danger follows threshold', async () => {
   const safe = await run(ex('gaz'), { ms: 1400 });
-  assert.match(safe.out, /NAFAS tayyor!/);
-  assert.match(safe.out, /Gaz darajasi: \d+\r\nXavfsiz/);
+  assert.match(safe.out, /NAFAS ready!/);
+  assert.match(safe.out, /Gas level: \d+\r\nSafe/);
   const danger = await run(ex('gaz'), { ms: 1400, sensors: { propane: 900 } });
-  assert.match(danger.out, /XAVF!/);
+  assert.match(danger.out, /DANGER! Gas leak!/);
   // Changing the threshold in code changes behaviour.
-  const hi = await run(ex('gaz').replace('int chegara = 200;', 'int chegara = 900;'), { ms: 1400, sensors: { propane: 900 } });
-  assert.doesNotMatch(hi.out, /XAVF!/);
+  const hi = await run(ex('gaz').replace('int threshold = 200;', 'int threshold = 900;'), { ms: 1400, sensors: { propane: 900 } });
+  assert.doesNotMatch(hi.out, /DANGER! Gas leak!/);
   // Changing the printed text changes the monitor.
-  const txt = await run(ex('gaz').replace('"Gaz darajasi: "', '"GAS = "'), { ms: 1400 });
+  const txt = await run(ex('gaz').replace('"Gas level: "', '"GAS = "'), { ms: 1400 });
   assert.match(txt.out, /GAS = \d+/);
 });
 
 test('temperature examples with DHT22', async () => {
   const cold = await run(ex('harorat'), { ms: 300 });
-  assert.match(cold.out, /Harorat: 2[345]\.\d C/);
+  assert.match(cold.out, /Temperature: 2[345]\.\d C/);
   const hot = await run(ex('harorat'), { ms: 300, sensors: { temperature: 45 } });
-  assert.match(hot.out, /DIQQAT/);
-  const full = await run(ex('toliq'), { ms: 1500, sensors: { temperature: 45, methane: 2000 } });
+  assert.match(hot.out, /WARNING/);
+  const full = await run(ex('nafas'), { ms: 1500, sensors: { temperature: 45, methane: 2000 } });
   assert.match(full.out, /T=4[45]\.\dC/);
-  assert.match(full.out, /XAVF! Bir nechta/);
+  assert.match(full.out, /DANGER: gas leak!/);
 });
 
 test('serial input', async () => {
   const r = await run(ex('serial'), { ms: 1500, input: '350\n' });
-  assert.match(r.out, /Chegara o'zgardi: 350/);
+  assert.match(r.out, /Threshold set to 350/);
 });
 
 test('C semantics', async () => {
@@ -145,15 +145,19 @@ test('missing pinMode diag', async () => {
 });
 
 test('ESP32 example uses ESP32 wiring', async () => {
-  const r = await run(exampleCode(RAW[1], BOARDS.esp32), { board: BOARDS.esp32, ms: 300, sensors: { temperature: 45 } });
-  assert.match(r.out, /DIQQAT/);
-  assert.match(r.out, /Harorat: 4[45]\.\d C/);
+  const r = await run(exampleCode(RAW.find((e) => e.id === 'harorat'), BOARDS.esp32), { board: BOARDS.esp32, ms: 300, sensors: { temperature: 45 } });
+  assert.match(r.out, /WARNING/);
+  assert.match(r.out, /Temperature: 4[45]\.\d C/);
 });
 
-test('PIR and button', async () => {
-  const code = exampleCode(RAW.find((e) => e.id === 'harakat'), BOARDS.uno);
-  const r = await run(code, { ms: 300, sensors: { motion: 1, button: 0 } });
-  assert.match(r.out, /Xonada harakat bor!/);
-  const b = await run(code, { ms: 300, sensors: { motion: 0, button: 1 } });
-  assert.match(b.out, /Signal o'chirildi/);
+test('silence button', async () => {
+  const code = exampleCode(RAW.find((e) => e.id === 'tugma'), BOARDS.uno);
+  const r = await run(code, { ms: 300, sensors: { propane: 900, button: 1 } });
+  assert.match(r.out, /Alarm silenced/);
+});
+
+test('NAFAS monitor beeps above 40 C', async () => {
+  const r = await run(ex('nafas'), { ms: 900, sensors: { temperature: 45 } });
+  assert.match(r.out, /WARNING: too hot!/);
+  assert.ok(r.pins.some(([p, , tone]) => p === 8 && tone > 0));
 });

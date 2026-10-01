@@ -15,7 +15,7 @@ npm test         # kompilyator va simulyator testlari
 
 | TZ bandi | Holat |
 |---|---|
-| 4–5. Kirish sahifasi | Olib tashlandi (so‘rov bo‘yicha): sayt to‘g‘ridan-to‘g‘ri xona bilan ochiladi |
+| 4–5. Kirish sahifasi | Olib tashlandi (so‘rov bo‘yicha): sayt to‘g‘ridan-to‘g‘ri xona bilan ochiladi. Interfeys tili — ingliz |
 | 6. Virtual xona | ✅ Eshik, divan, televizor, isitkich (radiator), deraza, gaz quvuri; qurilma eshik yonida, devorning yuqorisida |
 | 7. Sensor paneli | ✅ Harorat (°C), propan, metan — jonli qiymat, ADC qiymati, grafik |
 | 8–9. Arduino IDE ko‘rinishidagi muharrir | ✅ To‘q tema, rangli kod, qator raqamlari, `.ino` yorlig‘i, Verify / Upload, plata tanlash |

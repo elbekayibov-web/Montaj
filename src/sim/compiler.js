@@ -173,7 +173,7 @@ class Gen {
     }
     if (spec.ptr) {
       if (spec.ptr === 1 && t.k === 'char') return T.lit;
-      throw this.err(spec, 'pointers are not supported by the NAFAS simulator', 'Ko‘rsatkichlar simulyatorda qo‘llab-quvvatlanmaydi. Matn uchun String yoki const char* ishlating.');
+      throw this.err(spec, 'pointers are not supported by the NAFAS simulator', 'Pointers are not supported by the simulator. Use String or const char* for text.');
     }
     return t;
   }
@@ -236,20 +236,20 @@ class Gen {
     const from = e.t;
     const bad = () => this.err(node, `cannot convert '${typeName(from, this.board)}' to '${typeName(to, this.board)}' in ${ctx}`,
       isStrLike(from) && isNum(to)
-        ? 'Matnni songa to‘g‘ridan-to‘g‘ri berib bo‘lmaydi. String uchun .toInt() yoki .toFloat() ishlating.'
-        : 'Turlar mos kelmaydi.');
+        ? 'Text cannot be assigned to a number. Use .toInt() or .toFloat() on a String.'
+        : 'The types do not match.');
     if (from.k === 'arr' || to.k === 'arr') {
       if (from.k === 'arr' && to.k === 'arr') return e.c;
       if (from.k === 'arr' && from.of.k === 'char' && isStrLike(to)) return `__c.chars(${e.c})`;
       throw this.err(node, from.k === 'arr' ? `invalid conversion from '${typeName(from, this.board)}' to '${typeName(to, this.board)}'` : 'invalid array assignment',
-        'Massivni bitta o‘zgaruvchiga berib bo‘lmaydi — elementini [indeks] bilan oling.');
+        'A whole array cannot be assigned to a single variable — take one element with [index].');
     }
     if (to.k === 'void') return e.c;
     if (to.k === 'cls' || from.k === 'cls') {
       if (to.k === 'cls' && from.k === 'cls' && to.name === from.name) return e.c;
       throw bad();
     }
-    if (from.k === 'void') throw this.err(node, 'void value not ignored as it ought to be', 'Bu funksiya hech qanday qiymat qaytarmaydi (void).');
+    if (from.k === 'void') throw this.err(node, 'void value not ignored as it ought to be', 'This function does not return a value (void).');
     if (to.k === 'float') {
       if (isStrLike(from)) throw bad();
       return e.c;
@@ -266,7 +266,7 @@ class Gen {
         const [lo, hi] = range(to);
         if (e.v >= lo && e.v <= hi) return e.c;
         if (!explicit) this.warn(node, `overflow in conversion from '${typeName(from, this.board)}' to '${typeName(to, this.board)}' changes value`, '-Woverflow',
-          `${e.v} soni ${typeName(to, this.board)} turiga sig‘maydi (${lo}…${hi}).`);
+          `${e.v} does not fit in ${typeName(to, this.board)} (${lo}…${hi}).`);
         return `__c.${castFn(to)}(${e.c})`;
       }
       const rf = range(from);
@@ -369,13 +369,13 @@ class Gen {
       if (prev) {
         if (prev.hasBody && d.body) {
           throw this.err(d, `redefinition of '${typeName(ret, this.board)} ${d.name}(${params.map((p) => typeName(p.t, this.board)).join(', ')})'`,
-            `“${d.name}” funksiyasi ikki marta yozilgan (birinchisi ${prev.line}-qatorda).`);
+            `The function “${d.name}” is defined twice (first on line ${prev.line}).`);
         }
         if (d.body) Object.assign(prev, { params, ret, hasBody: true, line: d.line, node: d });
         continue;
       }
       if (this.builtins[d.name] && d.body) {
-        throw this.err(d, `redefinition of '${d.name}'`, `“${d.name}” — Arduino’ning o‘z funksiyasi. Boshqa nom tanlang.`);
+        throw this.err(d, `redefinition of '${d.name}'`, `“${d.name}” is a built-in Arduino function. Choose another name.`);
       }
       this.funcs.set(d.name, { name: d.name, js: `$${d.name}`, ret, params, hasBody: !!d.body, line: d.line, node: d });
     }
@@ -400,14 +400,14 @@ class Gen {
       const f = this.funcs.get(need);
       if (!f || !f.hasBody) {
         throw new CompileError(0, 0, `undefined reference to \`${need}'`,
-          `Har bir sketchda void ${need}() { ... } funksiyasi bo‘lishi shart. Nomini to‘g‘ri yozganingizni tekshiring (kichik harflar bilan).`);
+          `Every sketch needs a void ${need}() { ... } function. Check the spelling (lower case).`);
       }
-      if (f.params.length) throw this.err(f.node, `'${need}' must not take parameters`, `${need}() qavslari bo‘sh bo‘lishi kerak.`);
+      if (f.params.length) throw this.err(f.node, `'${need}' must not take parameters`, `The parentheses of ${need}() must be empty.`);
     }
     for (const [name, f] of this.funcs) {
       if (!f.hasBody && f.used) {
         throw new CompileError(f.line, 0, `undefined reference to \`${name}(${f.params.map((p) => typeName(p.t, this.board)).join(', ')})'`,
-          `“${name}” funksiyasining faqat e’loni bor, tanasi yozilmagan.`);
+          `“${name}” is only declared, its body is missing.`);
       }
     }
 
@@ -439,7 +439,7 @@ class Gen {
     const body = d.body.body.map((s) => this.stmt(s, scope)).join('\n');
     if (f.ret.k !== 'void' && d.name !== 'main' && !this.alwaysReturns(d.body)) {
       this.warn({ line: d.body.line, col: d.body.col }, `no return statement in function returning non-void`, '-Wreturn-type',
-        `“${d.name}” ${typeName(f.ret, this.board)} qaytarishi kerak, lekin ba’zi yo‘llarda return yo‘q.`);
+        `“${d.name}” must return ${typeName(f.ret, this.board)}, but some paths have no return.`);
     }
     const temps = this.fn.temps ? `let ${Array.from({ length: this.fn.temps }, (_, i) => `__t${i}`).join(', ')};` : '';
     return `async function ${f.js}(${params.join(', ')}) { ${temps}${prologue.join('')}\n${body}\n}`;
@@ -461,11 +461,11 @@ class Gen {
     const base = this.resolveType(d.type);
     const decl = [];
     const init = [];
-    if (base.k === 'void') throw this.err(d.declarators[0], `variable or field '${d.declarators[0].name}' declared void`, 'void — faqat funksiya turi. O‘zgaruvchi uchun int, float va h.k. ishlating.');
+    if (base.k === 'void') throw this.err(d.declarators[0], `variable or field '${d.declarators[0].name}' declared void`, 'void is only for functions. Use int, float, etc. for variables.');
     for (const dc of d.declarators) {
       if (scope.vars.has(dc.name)) {
         const prev = scope.vars.get(dc.name);
-        throw this.err(dc, `redeclaration of '${typeName(prev.t, this.board)} ${dc.name}'`, `“${dc.name}” shu sohada ${prev.line}-qatorda allaqachon e’lon qilingan.`);
+        throw this.err(dc, `redeclaration of '${typeName(prev.t, this.board)} ${dc.name}'`, `“${dc.name}” was already declared in this scope on line ${prev.line}.`);
       }
       if (isGlobal && this.funcs.has(dc.name)) {
         throw this.err(dc, `'${typeName(base, this.board)} ${dc.name}' redeclared as different kind of entity`);
@@ -474,13 +474,13 @@ class Gen {
       if (dc.dims.length) {
         const dims = dc.dims.map((de, i) => {
           if (!de) {
-            if (i !== 0 || !dc.init) throw this.err(dc, `storage size of '${dc.name}' isn't known`, 'Massiv o‘lchami ko‘rsatilmagan.');
+            if (i !== 0 || !dc.init) throw this.err(dc, `storage size of '${dc.name}' isn't known`, 'The array size is missing.');
             if (dc.init.k === 'initlist') return dc.init.items.length;
             if (dc.init.k === 'str') return dc.init.v.length + 1;
             return null;
           }
           const v = this.constEval(de);
-          if (v === undefined) throw this.err(de, `array bound is not an integer constant before ']' token`, 'Massiv o‘lchami o‘zgarmas son (yoki const) bo‘lishi kerak.');
+          if (v === undefined) throw this.err(de, `array bound is not an integer constant before ']' token`, 'The array size must be a constant number (or a const).');
           if (v <= 0) throw this.err(de, `size of array '${dc.name}' is ${v < 0 ? 'negative' : 'zero'}`);
           return v;
         });
@@ -509,7 +509,7 @@ class Gen {
         if (dc.ctorArgs.length !== 1) throw this.err(dc, `expression list treated as compound expression in initializer`);
         valueCode = this.cast(this.expr(dc.ctorArgs[0]), t, dc);
       } else {
-        if (d.type.isConst) throw this.err(dc, `uninitialized const '${dc.name}'`, 'const o‘zgaruvchiga darhol qiymat berilishi kerak.');
+        if (d.type.isConst) throw this.err(dc, `uninitialized const '${dc.name}'`, 'A const variable must get its value immediately.');
         valueCode = this.zero(t);
       }
       scope.vars.set(dc.name, entry);
@@ -543,9 +543,9 @@ class Gen {
         if (codes.length + 1 > dims[0]) throw this.err(node, `initializer-string for array of chars is too long`);
         return `[${[...codes, ...Array(dims[0] - codes.length).fill(0)].join(', ')}]`;
       }
-      if (node.k !== 'initlist') throw this.err(node, 'array must be initialized with a brace-enclosed initializer', 'Massiv {1, 2, 3} ko‘rinishida to‘ldiriladi.');
+      if (node.k !== 'initlist') throw this.err(node, 'array must be initialized with a brace-enclosed initializer', 'Initialise an array like this: {1, 2, 3}.');
       if (node.items.length > dims[0]) throw this.err(node, `too many initializers for '${typeName({ k: 'arr', of, dims }, this.board)}'`,
-        `Massivga ${dims[0]} ta element sig‘adi, lekin ${node.items.length} ta berilgan.`);
+        `The array holds ${dims[0]} elements but ${node.items.length} were given.`);
       const parts = node.items.map((it) => (dims.length > 1 ? build(dims.slice(1), of, it) : this.cast(this.expr(it), of, it)));
       const fill = dims.length > 1 ? this.zero({ k: 'arr', of, dims: dims.slice(1) }) : this.zero(of);
       while (parts.length < dims[0]) parts.push(fill);
@@ -590,7 +590,7 @@ class Gen {
       case 'if': {
         const c = this.cond(s.c, scope, 'if');
         if (s.then.k === 'empty') this.warn(s.then.line ? s.then : s, `suggest braces around empty body in an 'if' statement`, '-Wempty-body',
-          'if (...) dan keyin “;” qo‘yilgan — shart hech narsani boshqarmaydi!');
+          'There is a “;” right after if (...) — the condition controls nothing!');
         const then = this.stmt(s.then, new Scope(scope));
         const other = s.other ? ` else ${this.stmt(s.other, new Scope(scope))}` : '';
         return `if (${c}) ${this.wrapBlock(then)}${other}`;
@@ -623,7 +623,7 @@ class Gen {
         }
         const c = s.c ? this.cond(s.c, fs, 'for') : '';
         const upd = s.upd ? this.withScope(fs, () => this.expr(s.upd, { discard: true }).c) : '';
-        if (s.body.k === 'empty') this.warn(s, `for loop has empty body`, '-Wempty-body', 'for (...) dan keyin “;” — takrorlanadigan qism bo‘sh.');
+        if (s.body.k === 'empty') this.warn(s, `for loop has empty body`, '-Wempty-body', 'There is a “;” right after for (...) — the loop body is empty.');
         this.loopDepth++;
         const body = this.stmt(s.body, new Scope(fs));
         this.loopDepth--;
@@ -632,7 +632,7 @@ class Gen {
       case 'switch': {
         const e = this.withScope(scope, () => this.expr(s.e));
         if (!isIntLike(e.t)) {
-          throw this.err(s.e, `switch quantity not an integer`, 'switch faqat butun son (int, char) bilan ishlaydi. Matn uchun if/else ishlating.');
+          throw this.err(s.e, `switch quantity not an integer`, 'switch only works with whole numbers (int, char). Use if/else for text.');
         }
         this.switchDepth++;
         const inner = new Scope(scope);
@@ -641,7 +641,7 @@ class Gen {
           let head;
           if (c.test) {
             const v = this.withScope(scope, () => this.constEval(c.test));
-            if (v === undefined) throw this.err(c.test, `the value of '${c.test.name ?? 'expression'}' is not usable in a constant expression`, 'case qiymati o‘zgarmas son bo‘lishi kerak.');
+            if (v === undefined) throw this.err(c.test, `the value of '${c.test.name ?? 'expression'}' is not usable in a constant expression`, 'A case value must be a constant number.');
             if (seen.has(v)) throw this.err(c.test, `duplicate case value`);
             seen.add(v);
             head = `case ${v}:`;
@@ -654,12 +654,12 @@ class Gen {
       case 'return': {
         const ret = this.fn.ret;
         if (!s.e) {
-          if (ret.k !== 'void') throw this.err(s, `return-statement with no value, in function returning '${typeName(ret, this.board)}'`, 'Bu funksiya qiymat qaytarishi kerak: return qiymat;');
+          if (ret.k !== 'void') throw this.err(s, `return-statement with no value, in function returning '${typeName(ret, this.board)}'`, 'This function must return a value: return value;');
           return 'return;';
         }
         const e = this.withScope(scope, () => this.expr(s.e));
         if (ret.k === 'void') {
-          throw this.err(s, `return-statement with a value, in function returning 'void'`, 'void funksiya qiymat qaytarmaydi. Qiymat kerak bo‘lsa, funksiya turini int/float qiling.');
+          throw this.err(s, `return-statement with a value, in function returning 'void'`, 'A void function returns nothing. If you need a value, make the function int or float.');
         }
         return `return ${this.cast(e, ret, s.e, 'return')};`;
       }
@@ -686,10 +686,10 @@ class Gen {
     let inner = node;
     if (inner.k === 'assign' && inner.op === '=') {
       this.warn(inner, 'suggest parentheses around assignment used as truth value', '-Wparentheses',
-        `${kw} shartida “=” (qiymat berish) ishlatilgan. Taqqoslash uchun “==” yozing!`);
+        `The ${kw} condition uses “=” (assignment). Write “==” to compare!`);
     }
     const e = this.withScope(scope, () => this.expr(node));
-    if (e.t.k === 'void') throw this.err(node, 'could not convert to bool', 'void funksiya natijasini shart sifatida ishlatib bo‘lmaydi.');
+    if (e.t.k === 'void') throw this.err(node, 'could not convert to bool', 'The result of a void function cannot be used as a condition.');
     if (e.t.k === 'str' || e.t.k === 'cls') throw this.err(node, `could not convert '${typeName(e.t, this.board)}' to 'bool'`);
     return e.c;
   }
@@ -746,7 +746,7 @@ class Gen {
       case 'call': return this.call(n, opts);
       case 'index': return this.index(n);
       case 'member':
-        throw this.err(n, `invalid use of member function '${n.name}' (did you forget the '()' ?)`, `“${n.name}” dan keyin () qavslar yozilishi kerak.`);
+        throw this.err(n, `invalid use of member function '${n.name}' (did you forget the '()' ?)`, `“${n.name}” must be followed by ().`);
       case 'fcast':
         throw this.err(n, `expected primary-expression before '${n.name}'`);
       case 'initlist':
@@ -774,8 +774,8 @@ class Gen {
   undeclared(n, name) {
     const s = suggest(name, this.allNames());
     const hint = s
-      ? `Ehtimol “${s}” demoqchisiz? C++ katta-kichik harflarni farqlaydi.`
-      : `“${name}” e’lon qilinmagan. Avval o‘zgaruvchini e’lon qiling (masalan, int ${name} = 0;) yoki yozilishini tekshiring.`;
+      ? `Did you mean “${s}”? C++ is case-sensitive.`
+      : `“${name}” is not declared. Declare it first (for example int ${name} = 0;) or check the spelling.`;
     return this.err(n, `'${name}' was not declared in this scope${s ? `; did you mean '${s}'?` : ''}`, hint);
   }
 
@@ -792,7 +792,7 @@ class Gen {
     }
     if (n.name === 'Serial') return { c: '1', t: T.bool };
     if (this.funcs.has(n.name) || this.builtins[n.name]) {
-      throw this.err(n, `invalid use of function '${n.name}'`, `“${n.name}” — funksiya. Uni chaqirish uchun ${n.name}(...) yozing.`);
+      throw this.err(n, `invalid use of function '${n.name}'`, `“${n.name}” is a function. Call it as ${n.name}(...).`);
     }
     throw this.undeclared(n, n.name);
   }
@@ -822,10 +822,10 @@ class Gen {
   requireLvalue(e, n, what = 'assignment') {
     if (!e.lvc) {
       throw this.err(n, what === 'assignment' ? 'lvalue required as left operand of assignment' : `lvalue required as ${what} operand`,
-        'Chap tomonda o‘zgaruvchi bo‘lishi kerak. Taqqoslash uchun “==” ishlating.');
+        'The left side must be a variable. Use “==” to compare.');
     }
     if (e.isConst) {
-      throw this.err(n, `assignment of read-only variable '${e.name}'`, `“${e.name}” const (o‘zgarmas) deb e’lon qilingan — uning qiymatini o‘zgartirib bo‘lmaydi.`);
+      throw this.err(n, `assignment of read-only variable '${e.name}'`, `“${e.name}” is declared const — its value cannot change.`);
     }
     if (e.t.k === 'arr') throw this.err(n, 'invalid array assignment');
   }
@@ -847,7 +847,7 @@ class Gen {
     const b = this.expr(n.r);
     const tn = (x) => typeName(x.t, this.board);
     const badOps = () => this.err(n, `invalid operands of types '${tn(a)}' and '${tn(b)}' to binary 'operator${op}'`);
-    if (a.t.k === 'void' || b.t.k === 'void') throw this.err(n, 'void value not ignored as it ought to be', 'void funksiya qiymat qaytarmaydi.');
+    if (a.t.k === 'void' || b.t.k === 'void') throw this.err(n, 'void value not ignored as it ought to be', 'A void function returns no value.');
     if (a.t.k === 'cls' || b.t.k === 'cls') throw badOps();
 
     if (op === '&&' || op === '||') {
@@ -859,7 +859,7 @@ class Gen {
       if (['==', '!=', '<', '>', '<=', '>='].includes(op)) {
         if (!(isStrLike(a.t) || a.t.k === 'arr') || !(isStrLike(b.t) || b.t.k === 'arr')) {
           throw this.err(n, `no match for 'operator${op}' (operand types are '${tn(a)}' and '${tn(b)}')`,
-            'Matnni son bilan taqqoslab bo‘lmaydi. Kerak bo‘lsa .toInt() ishlating.');
+            'Text cannot be compared with a number. Use .toInt() if needed.');
         }
         const js = op === '==' ? '===' : op === '!=' ? '!==' : op;
         return { c: `(${this.toStr(a)} ${js} ${this.toStr(b)})`, t: T.bool };
@@ -872,10 +872,10 @@ class Gen {
       const [p, q] = a.t.k === 'lit' ? [a, b] : [b, a];
       if (q.t.k === 'lit' || q.t.k === 'float' || q.t.k === 'arr') {
         throw this.err(n, `invalid operands of types '${tn(a)}' and '${tn(b)}' to binary 'operator+'`,
-          'Ikki qo‘shtirnoqli matnni yoki matn bilan kasr sonni “+” bilan qo‘shib bo‘lmaydi. Birinchisini String(...) ichiga oling: String("Harorat: ") + t');
+          'Two string literals, or a string literal and a decimal number, cannot be joined with “+”. Wrap the first one in String(...): String("Temperature: ") + t');
       }
       this.warn(n, 'adding an integer to a string literal does not append to the string', '-Wstring-plus-int',
-        'Bu matnga son qo‘shmaydi, balki matnni surib yuboradi (ko‘rsatkich arifmetikasi) — ekranda buzuq matn chiqadi. To‘g‘risi: String("matn") + son');
+        'This does not append the number — it shifts the text (pointer arithmetic), so garbage is printed. Use: String("text") + number');
       return { c: `__c.ptradd(${p.c}, ${q.c})`, t: T.lit };
     }
 
@@ -898,7 +898,7 @@ class Gen {
         const [lo, hi] = range(t);
         if (v < lo || v > hi) {
           this.warn(n, `integer overflow in expression of type '${typeName(t, this.board)}' results in '${wrapInt(v, t)}'`, '-Woverflow',
-            `${this.board.name} platasida ${typeName(t, this.board)} ${lo}…${hi} oralig‘ida. Katta son uchun long yoki 1000UL kabi yozing.`);
+            `On ${this.board.name}, ${typeName(t, this.board)} ranges ${lo}…${hi}. Use long or write 1000UL for big numbers.`);
         }
         const w = wrapInt(v, t);
         return { c: String(w), t, k: 'const', v: w };
@@ -937,12 +937,12 @@ class Gen {
   index(n) {
     const o = this.expr(n.obj);
     const i = this.expr(n.idx);
-    if (!isIntLike(i.t)) throw this.err(n.idx, `invalid types '${typeName(o.t, this.board)}[${typeName(i.t, this.board)}]' for array subscript`, 'Massiv indeksi butun son bo‘lishi kerak.');
+    if (!isIntLike(i.t)) throw this.err(n.idx, `invalid types '${typeName(o.t, this.board)}[${typeName(i.t, this.board)}]' for array subscript`, 'An array index must be a whole number.');
     if (o.t.k === 'arr') {
       const t = o.t.dims.length > 1 ? { k: 'arr', of: o.t.of, dims: o.t.dims.slice(1) } : o.t.of;
       if (i.k === 'const' && o.t.dims[0] && (i.v >= o.t.dims[0] || i.v < 0)) {
         this.warn(n, `array subscript ${i.v} is outside array bounds of '${typeName(o.t, this.board)}'`, '-Warray-bounds',
-          `Massivda ${o.t.dims[0]} ta element bor: indekslar 0…${o.t.dims[0] - 1}.`);
+          `The array has ${o.t.dims[0]} elements: indexes 0…${o.t.dims[0] - 1}.`);
       }
       const lvc = `${o.c}[${i.c}]`;
       const read = t.k === 'arr' ? lvc : `__c.at(${o.c}, ${i.c})`;
@@ -950,7 +950,7 @@ class Gen {
     }
     if (isStrLike(o.t)) return { c: `__c.charAt(${o.c}, ${i.c})`, t: T.char };
     throw this.err(n, `invalid types '${typeName(o.t, this.board)}[${typeName(i.t, this.board)}]' for array subscript`,
-      `“${o.name ?? 'bu'}” massiv emas, unga [ ] bilan murojaat qilib bo‘lmaydi.`);
+      `“${o.name ?? 'this'}” is not an array, it cannot be indexed with [ ].`);
   }
 
   args(n) { return n.args.map((a) => this.expr(a)); }
@@ -963,7 +963,7 @@ class Gen {
     const name = callee.name;
     const local = this.lookupVar(name);
     if (local) {
-      throw this.err(callee, `'${name}' cannot be used as a function`, `“${name}” — o‘zgaruvchi, funksiya emas.`);
+      throw this.err(callee, `'${name}' cannot be used as a function`, `“${name}” is a variable, not a function.`);
     }
     const f = this.funcs.get(name);
     if (f) {
@@ -971,8 +971,8 @@ class Gen {
       const args = this.args(n);
       const required = f.params.filter((p) => !p.def).length;
       const sig = `${typeName(f.ret, this.board)} ${name}(${f.params.map((p) => typeName(p.t, this.board)).join(', ')})`;
-      if (args.length < required) throw this.err(n, `too few arguments to function '${sig}'`, `“${name}” ${required} ta argument kutadi, ${args.length} ta berilgan.`);
-      if (args.length > f.params.length) throw this.err(n, `too many arguments to function '${sig}'`, `“${name}” ${f.params.length} ta argument kutadi, ${args.length} ta berilgan.`);
+      if (args.length < required) throw this.err(n, `too few arguments to function '${sig}'`, `“${name}” expects ${required} argument(s), ${args.length} given.`);
+      if (args.length > f.params.length) throw this.err(n, `too many arguments to function '${sig}'`, `“${name}” expects ${f.params.length} argument(s), ${args.length} given.`);
       const codes = args.map((a, i) => this.cast(a, f.params[i].t, n.args[i], 'argument passing'));
       return { c: `(await ${f.js}(${codes.join(', ')}))`, t: f.ret };
     }
@@ -981,7 +981,7 @@ class Gen {
       const args = this.args(n);
       if (args.length < b.min || args.length > b.max) {
         throw this.err(n, `too ${args.length < b.min ? 'few' : 'many'} arguments to function '${b.sig}'`,
-          `${name}() ${b.min === b.max ? b.min : `${b.min}–${b.max}`} ta argument oladi, ${args.length} ta berilgan.`);
+          `${name}() takes ${b.min === b.max ? b.min : `${b.min}–${b.max}`} argument(s), ${args.length} given.`);
       }
       args.forEach((a, i) => {
         if (b.types && b.types[i] === 'num' && !isNum(a.t)) {
@@ -1016,7 +1016,7 @@ class Gen {
     const args = this.args(n);
     const argc = args.length;
     const need = (min, max, sig) => {
-      if (argc < min || argc > max) throw this.err(n, `no matching function for call to '${sig}'`, `${m.name}() ${min === max ? min : `${min}–${max}`} ta argument oladi.`);
+      if (argc < min || argc > max) throw this.err(n, `no matching function for call to '${sig}'`, `${m.name}() takes ${min === max ? min : `${min}–${max}`} argument(s).`);
     };
     // Serial.*
     if (objNode.k === 'id' && objNode.name === 'Serial' && !this.lookupVar('Serial')) {
@@ -1025,7 +1025,7 @@ class Gen {
       if (!spec) {
         const s = suggest(m.name, Object.keys(S));
         throw this.err(m, `'class HardwareSerial' has no member named '${m.name}'${s ? `; did you mean '${s}'?` : ''}`,
-          s ? `Ehtimol Serial.${s} demoqchisiz?` : `Serial’da “${m.name}” degan buyruq yo‘q.`);
+          s ? `Did you mean Serial.${s}?` : `Serial has no command called “${m.name}”.`);
       }
       need(spec.min, spec.max, `HardwareSerial::${m.name}(...)`);
       return spec.gen(args, this, n);
@@ -1051,7 +1051,7 @@ class Gen {
     }
     if (isStrLike(o.t)) return this.stringMethod(o, m, n, args, need);
     throw this.err(m, `request for member '${m.name}' in '${objNode.name ?? 'expression'}', which is of non-class type '${typeName(o.t, this.board)}'`,
-      `“${objNode.name ?? 'bu'}” — ${typeName(o.t, this.board)} turidagi qiymat, uning metodlari yo‘q.`);
+      `“${objNode.name ?? 'this'}” is a ${typeName(o.t, this.board)} value, it has no methods.`);
   }
 
   stringMethod(o, m, n, args, need) {
@@ -1088,7 +1088,7 @@ class Gen {
     };
     if (o.t.k === 'lit') {
       throw this.err(m, `request for member '${m.name}' in '${o.name ?? 'string literal'}', which is of non-class type 'const char*'`,
-        'Bu metod faqat String turida ishlaydi: String matn = "..."; deb e’lon qiling.');
+        'This method only works on String: declare it as String text = "...";');
     }
     const spec = M[m.name];
     if (!spec) {
@@ -1194,7 +1194,7 @@ function makeBuiltins(board) {
     F: {
       min: 1, max: 1, sig: 'F(string_literal)',
       gen: (a, g, n) => {
-        if (a[0].t.k !== 'lit') throw g.err(n, 'F() macro requires a string literal', 'F() ichida faqat qo‘shtirnoqli matn bo‘ladi.');
+        if (a[0].t.k !== 'lit') throw g.err(n, 'F() macro requires a string literal', 'F() only accepts a string literal.');
         return { c: a[0].c, t: T.lit };
       },
     },

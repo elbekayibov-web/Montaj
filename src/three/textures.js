@@ -405,7 +405,7 @@ export function wheatField(w = 1024, h = 640) {
 
 // Try the real painting from Wikimedia Commons (public domain); fall back to
 // the generated one if the network or the host's CSP blocks it.
-export function paintingTexture(url, fallback) {
+export function paintingTexture(url, fallback, aspect = 1) {
   const tex = toTexture(fallback());
   if (!url) return tex;
   const img = new Image();
@@ -413,6 +413,10 @@ export function paintingTexture(url, fallback) {
   img.referrerPolicy = 'no-referrer';
   img.onload = () => {
     tex.image = img;
+    // cover-crop the real image into the frame
+    const ia = img.width / img.height;
+    if (ia > aspect) { tex.repeat.set(aspect / ia, 1); tex.offset.set((1 - aspect / ia) / 2, 0); }
+    else { tex.repeat.set(1, ia / aspect); tex.offset.set(0, (1 - ia / aspect) / 2); }
     tex.needsUpdate = true;
   };
   img.src = url;
@@ -424,33 +428,36 @@ export const PAINTINGS = {
   adam: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Michelangelo_-_Creation_of_Adam_%28cropped%29.jpg/960px-Michelangelo_-_Creation_of_Adam_%28cropped%29.jpg',
 };
 
-// Night sky seen through the window.
-export function nightSky() {
-  const [c, g] = canvas(512, 512);
+// Night sky used as the scene background (equirectangular, at infinity).
+export function nightSkyDome() {
+  const w = 2048;
+  const h = 1024;
+  const [c, g] = canvas(w, h);
   const r = rng(42);
-  const grd = g.createLinearGradient(0, 0, 0, 512);
-  grd.addColorStop(0, '#07121f');
-  grd.addColorStop(0.55, '#10263a');
-  grd.addColorStop(0.85, '#2b4556');
-  grd.addColorStop(1, '#5b5a55');
+  const grd = g.createLinearGradient(0, 0, 0, h);
+  grd.addColorStop(0, '#020406');
+  grd.addColorStop(0.3, '#050a10');
+  grd.addColorStop(0.47, '#0d1a26');
+  grd.addColorStop(0.5, '#1b2530');
+  grd.addColorStop(0.53, '#07090b');
+  grd.addColorStop(1, '#030405');
   g.fillStyle = grd;
-  g.fillRect(0, 0, 512, 512);
-  for (let i = 0; i < 180; i++) {
-    g.fillStyle = `rgba(255,255,255,${0.2 + r() * 0.7})`;
-    const s = r() * 1.6 + 0.4;
-    g.fillRect(r() * 512, r() * 330, s, s);
+  g.fillRect(0, 0, w, h);
+  // faint milky band
+  for (let i = 0; i < 4000; i++) {
+    const x = r() * w;
+    const y = h * 0.18 + Math.sin(x / w * Math.PI * 2) * h * 0.08 + (r() - 0.5) * h * 0.12;
+    g.fillStyle = `rgba(170,190,220,${r() * 0.05})`;
+    g.fillRect(x, y, 2, 2);
   }
-  // distant city skyline
-  for (let x = 0; x < 512; x += 10 + r() * 22) {
-    const bh = 30 + r() * 110;
-    const bw = 16 + r() * 30;
-    g.fillStyle = '#0b1622';
-    g.fillRect(x, 512 - bh, bw, bh);
-    for (let wy = 512 - bh + 6; wy < 506; wy += 9) {
-      for (let wx = x + 3; wx < x + bw - 3; wx += 6) {
-        if (r() > 0.72) { g.fillStyle = `rgba(255,${190 + r() * 50},${110 + r() * 60},${0.5 + r() * 0.4})`; g.fillRect(wx, wy, 2.5, 3.5); }
-      }
-    }
+  for (let i = 0; i < 1400; i++) {
+    const y = Math.pow(r(), 1.4) * h * 0.47;
+    const a = 0.15 + r() * 0.7 * (1 - y / (h * 0.5));
+    g.fillStyle = `rgba(${220 + r() * 35},${225 + r() * 30},255,${a})`;
+    const sz = r() > 0.97 ? 2 : 1;
+    g.fillRect(r() * w, y, sz, sz);
   }
-  return toTexture(c);
+  const tex = toTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  return tex;
 }

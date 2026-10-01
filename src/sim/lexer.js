@@ -55,7 +55,7 @@ export function stripComments(src) {
       const startCol = colOf(src, i);
       blank(i++); blank(i++);
       while (i < n && !(src[i] === '*' && src[i + 1] === '/')) blank(i++);
-      if (i >= n) throw new CompileError(startLine, startCol, 'unterminated comment', 'Izoh /* ... */ yopilmagan — oxiriga */ qo‘ying.');
+      if (i >= n) throw new CompileError(startLine, startCol, 'unterminated comment', 'The /* ... */ comment is never closed — add */ at its end.');
       blank(i++); blank(i++);
       continue;
     }
@@ -134,7 +134,7 @@ export function preprocess(src) {
       const lib = im[1];
       if (!KNOWN_LIBS[lib]) {
         throw new CompileError(lineNo, indent + 10, `${lib}: No such file or directory`,
-          `“${lib}” kutubxonasi simulyatorda yo‘q. Mavjudlari: DHT.h, Wire.h, SPI.h, math.h.`);
+          `The “${lib}” library is not available in the simulator. Available: DHT.h, Wire.h, SPI.h, math.h.`);
       }
       includes.push({ lib, line: lineNo });
       continue;
@@ -144,7 +144,7 @@ export function preprocess(src) {
       if (!dm) throw new CompileError(lineNo, dcol + 7, 'macro names must be identifiers');
       if (dm[2]) {
         throw new CompileError(lineNo, dcol + 7, `function-like macro '${dm[1]}' is not supported`,
-          'Simulyator faqat oddiy #define NOM qiymat ko‘rinishini qo‘llaydi. Buning o‘rniga funksiya yozing.');
+          'Only simple #define NAME value macros are supported. Write a function instead.');
       }
       const valueCol = raw.indexOf(dm[3]) + 1 || dcol;
       macros.set(dm[1], { text: dm[3], line: lineNo, col: valueCol });
@@ -208,7 +208,7 @@ export function tokenize(src, startLine = 1, startCol = 1) {
       const m = src.slice(i).match(/^(0[xX][0-9a-fA-F]+|0[bB][01]+|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)([uUlLfF]*)(\w*)/);
       if (m[3]) {
         throw new CompileError(tl, tc, `invalid suffix "${m[3]}" on integer constant`,
-          'Son noto‘g‘ri yozilgan — son va harf orasida bo‘sh joy yoki operator qolib ketgan bo‘lishi mumkin.');
+          'Malformed number — a space or an operator is probably missing between the number and the letters.');
       }
       const raw = m[1];
       const suf = m[2].toLowerCase();
@@ -231,14 +231,14 @@ export function tokenize(src, startLine = 1, startCol = 1) {
       let j = i + 1;
       let s = '';
       while (j < n && src[j] !== '"') {
-        if (src[j] === '\n') throw new CompileError(tl, tc, 'missing terminating " character', 'Qo‘shtirnoq (") yopilmagan.');
+        if (src[j] === '\n') throw new CompileError(tl, tc, 'missing terminating " character', 'The double quote (") is never closed.');
         if (src[j] === '\\') {
           const e = readEscape(src, j);
           s += String.fromCharCode(e.code);
           j += e.len;
         } else s += src[j++];
       }
-      if (j >= n) throw new CompileError(tl, tc, 'missing terminating " character', 'Qo‘shtirnoq (") yopilmagan.');
+      if (j >= n) throw new CompileError(tl, tc, 'missing terminating " character', 'The double quote (") is never closed.');
       toks.push({ t: 'str', v: s, line: tl, col: tc, end: tc + (j + 1 - i) });
       adv(j + 1 - i);
       continue;
@@ -261,10 +261,10 @@ export function tokenize(src, startLine = 1, startCol = 1) {
         const close = src.indexOf("'", j);
         const nl = src.indexOf('\n', j);
         if (close === -1 || (nl !== -1 && nl < close)) {
-          throw new CompileError(tl, tc, "missing terminating ' character", 'Bitta tirnoq (\') yopilmagan. Matn uchun qo‘shtirnoq (") ishlating.');
+          throw new CompileError(tl, tc, "missing terminating ' character", 'The single quote (\') is never closed. Use double quotes (") for text.');
         }
         throw new CompileError(tl, tc, 'character constant too long for its type',
-          'Bitta tirnoq ichida faqat bitta belgi bo‘ladi. Matn uchun qo‘shtirnoq (") ishlating.');
+          'Single quotes hold exactly one character. Use double quotes (") for text.');
       }
       toks.push({ t: 'chr', v: code, line: tl, col: tc, end: tc + (j + 1 - i) });
       adv(j + 1 - i);
@@ -276,12 +276,12 @@ export function tokenize(src, startLine = 1, startCol = 1) {
       adv(p.length);
       continue;
     }
-    if (c === '#') throw new CompileError(tl, tc, "stray '#' in program", 'Preprotsessor buyrug‘i (#include, #define) qator boshida bo‘lishi kerak.');
+    if (c === '#') throw new CompileError(tl, tc, "stray '#' in program", 'Preprocessor directives (#include, #define) must start a line.');
     const code = c.charCodeAt(0);
     if (code > 127) {
       const hint = /[“”‘’]/.test(c)
-        ? 'Word/Telegramdan ko‘chirilgan “chiroyli” qo‘shtirnoq. Oddiy " yoki \' bilan almashtiring.'
-        : 'Kodda lotin bo‘lmagan belgi bor (masalan, kirill harfi yoki maxsus belgi).';
+        ? '“Smart” quotes copied from Word or a messenger. Replace them with plain " or \'.'
+        : 'The code contains a non-ASCII character (for example a Cyrillic letter or a special symbol).';
       throw new CompileError(tl, tc, `stray '\\${code.toString(8)}' in program`, hint);
     }
     throw new CompileError(tl, tc, `stray '${c}' in program`);

@@ -205,7 +205,7 @@ export class Runtime {
 
   validPin(p, fn) {
     if (!Number.isInteger(p) || p < 0 || p >= this.board.digitalPins + (this.board.arch === 'esp32' ? 0 : 0)) {
-      this.diag(`badpin-${fn}-${p}`, `${fn}(${p}, …): ${this.board.name} platasida ${p}-pin yo‘q — buyruq e’tiborsiz qoldirildi.`);
+      this.diag(`badpin-${fn}-${p}`, `${fn}(${p}, …): ${this.board.name} has no pin ${p} — the call was ignored.`);
       return false;
     }
     return true;
@@ -235,7 +235,7 @@ export class Runtime {
       async end() { rt.baud = 0; },
       async emit(text) {
         if (!rt.baud) {
-          rt.diag('nobegin', 'Serial.print ishlatilgan, lekin setup() ichida Serial.begin(9600) chaqirilmagan — Serial Monitor’da hech narsa chiqmaydi.');
+          rt.diag('nobegin', 'Serial.print is used but Serial.begin(9600) is never called in setup() — nothing will appear in the Serial Monitor.');
           return 0;
         }
         const now = performance.now();
@@ -373,7 +373,7 @@ export class Runtime {
         st.value = v ? 1 : 0;
         st.pwm = 0;
         if (st.mode !== 1 && (p === W.buzzer || p === W.led)) {
-          rt.diag(`nomode-${p}`, `digitalWrite(${nameOf(p)}, …) ishladi, lekin pinMode(${nameOf(p)}, OUTPUT) yozilmagan. Haqiqiy platada pin chiqishga sozlanmagani uchun ${p === W.buzzer ? 'buzzer ovoz chiqarmaydi' : 'LED juda xira yonadi'}.`);
+          rt.diag(`nomode-${p}`, `digitalWrite(${nameOf(p)}, …) ran, but pinMode(${nameOf(p)}, OUTPUT) is missing. On a real board the pin is not an output, so ${p === W.buzzer ? 'the buzzer stays silent' : 'the LED glows very dimly'}.`);
         }
         rt.emitPin(p);
       },
@@ -388,7 +388,7 @@ export class Runtime {
           // Button connects the pin to GND: pressed = LOW. Without the pull-up it floats.
           if (rt.hw.readSensor('button')) return 0;
           if (st.mode === 2) return 1;
-          rt.diag('btn-float', `Tugma ${nameOf(p)}-pinda: pinMode(${nameOf(p)}, INPUT_PULLUP) yozilmagan, shuning uchun bosilmaganda qiymat tasodifiy (suzuvchi).`);
+          rt.diag('btn-float', `Button on pin ${nameOf(p)}: pinMode(${nameOf(p)}, INPUT_PULLUP) is missing, so the pin floats and reads random values when not pressed.`);
           return rt.rand() > 0.5 ? 1 : 0;
         }
         return rt.rand() > 0.5 ? 1 : 0; // floating input
@@ -406,9 +406,9 @@ export class Runtime {
         else {
           const isAnalog = Object.values(B.analogNames).includes(p);
           if (!isAnalog) {
-            rt.diag(`notanalog-${p}`, `analogRead(${p}): bu pin analog kirish emas yoki unga hech narsa ulanmagan — tasodifiy qiymatlar keladi.`);
+            rt.diag(`notanalog-${p}`, `analogRead(${p}): this pin is not an analog input or nothing is connected — expect random values.`);
           } else {
-            rt.diag(`floating-${p}`, `analogRead(${nameOf(p)}): bu pinga sensor ulanmagan, qiymatlar “suzib” yuradi. Gaz sensorlari: propan ${nameOf(W.propane)}, metan ${nameOf(W.methane)}.`);
+            rt.diag(`floating-${p}`, `analogRead(${nameOf(p)}): no sensor is wired to this pin, the reading floats. Gas sensors: propane ${nameOf(W.propane)}, methane ${nameOf(W.methane)}.`);
           }
           const prev = rt.floating.get(p) ?? 0.35;
           const next = Math.min(0.8, Math.max(0.1, prev + (rt.rand() - 0.5) * 0.08));
@@ -424,7 +424,7 @@ export class Runtime {
         const st = rt.pin(p);
         v = Math.max(0, Math.min(255, Math.trunc(v)));
         if (B.pwmPins && !B.pwmPins.includes(p)) {
-          rt.diag(`pwm-${p}`, `analogWrite(${p}, …): ${B.name} platasida ${p}-pin PWM emas (PWM pinlar: ${B.pwmPins.join(', ')}). Pin faqat HIGH/LOW bo‘ladi.`);
+          rt.diag(`pwm-${p}`, `analogWrite(${p}, …): pin ${p} on ${B.name} is not PWM (PWM pins: ${B.pwmPins.join(', ')}). It can only be HIGH or LOW.`);
           st.value = v >= 128 ? 1 : 0;
           st.pwm = 0;
         } else {
@@ -470,15 +470,15 @@ export class Runtime {
         const read = () => {
           const now = performance.now();
           if (!begun) {
-            rt.diag('dht-begin', 'dht.begin() chaqirilmagan — DHT sensor o‘qilmaydi (nan). setup() ichiga dht.begin(); qo‘shing.');
+            rt.diag('dht-begin', 'dht.begin() was not called — the DHT sensor reads nan. Add dht.begin(); to setup().');
             return { t: NaN, h: NaN };
           }
           if (pin !== W.dht) {
-            rt.diag('dht-pin', `DHT sensor ${nameOf(pin)}-pin deb ko‘rsatilgan, lekin u ${nameOf(W.dht)}-pinga ulangan. Natija: nan (o‘qib bo‘lmadi).`);
+            rt.diag('dht-pin', `The DHT sensor is set to pin ${nameOf(pin)}, but it is wired to ${nameOf(W.dht)}. Result: nan (read failed).`);
             return { t: NaN, h: NaN };
           }
           if (type !== 22 && type !== 21) {
-            rt.diag('dht-type', `Sensor turi noto‘g‘ri: ulangan sensor DHT22, kodda DHT${type}. Qiymatlar buzilib keladi.`);
+            rt.diag('dht-type', `Wrong sensor type: a DHT22 is connected but the code says DHT${type}. The values come out wrong.`);
           }
           if (now - lastRead >= 2000) {
             lastRead = now;

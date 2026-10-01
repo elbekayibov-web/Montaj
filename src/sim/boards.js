@@ -64,11 +64,11 @@ export function pinLabel(board, pin) {
 }
 
 export const WIRING_INFO = [
-  { key: 'propane', part: 'MQ-2', role: 'Propan sensori (analog)' },
-  { key: 'methane', part: 'MQ-4', role: 'Metan sensori (analog)' },
-  { key: 'dht', part: 'DHT22', role: 'Harorat + namlik (raqamli)' },
-  { key: 'buzzer', part: 'Buzzer', role: 'Faol buzzer (HIGH = ovoz)' },
-  { key: 'led', part: 'LED', role: 'Qizil signal chirog‘i' },
-  { key: 'pir', part: 'HC-SR501', role: 'Harakat sensori (PIR)' },
-  { key: 'button', part: 'Tugma', role: 'Tugma → GND (INPUT_PULLUP)' },
+  { key: 'propane', part: 'MQ-2', role: 'Propane sensor (analog)' },
+  { key: 'methane', part: 'MQ-4', role: 'Methane sensor (analog)' },
+  { key: 'dht', part: 'DHT22', role: 'Temperature + humidity' },
+  { key: 'buzzer', part: 'Buzzer', role: 'Active buzzer (HIGH = sound)' },
+  { key: 'led', part: 'LED', role: 'Red alarm LED' },
+  { key: 'pir', part: 'HC-SR501', role: 'Motion sensor (PIR)' },
+  { key: 'button', part: 'Button', role: 'Button to GND (INPUT_PULLUP)' },
 ];

@@ -12,16 +12,16 @@ export const TYPE_WORDS = new Set([
 const INT_MODS = new Set(['unsigned', 'signed', 'long', 'short', 'int']);
 const QUALIFIERS = new Set(['const', 'static', 'volatile', 'constexpr', 'inline', 'extern', 'register']);
 const UNSUPPORTED = {
-  struct: 'struct (tuzilmalar) hozircha simulyatorda qo‘llab-quvvatlanmaydi.',
-  class: 'class yozish simulyatorda qo‘llab-quvvatlanmaydi.',
-  typedef: 'typedef simulyatorda qo‘llab-quvvatlanmaydi.',
-  enum: 'enum simulyatorda qo‘llab-quvvatlanmaydi — o‘rniga const int ishlating.',
-  union: 'union simulyatorda qo‘llab-quvvatlanmaydi.',
-  goto: 'goto simulyatorda qo‘llab-quvvatlanmaydi.',
-  new: 'Dinamik xotira (new) simulyatorda qo‘llab-quvvatlanmaydi.',
-  delete: 'Dinamik xotira (delete) simulyatorda qo‘llab-quvvatlanmaydi.',
-  template: 'Shablonlar (template) simulyatorda qo‘llab-quvvatlanmaydi.',
-  namespace: 'namespace simulyatorda qo‘llab-quvvatlanmaydi.',
+  struct: 'struct is not supported by the simulator yet.',
+  class: 'Writing classes is not supported by the simulator.',
+  typedef: 'typedef is not supported by the simulator.',
+  enum: 'enum is not supported by the simulator — use const int instead.',
+  union: 'union is not supported by the simulator.',
+  goto: 'goto is not supported by the simulator.',
+  new: 'Dynamic memory (new) is not supported by the simulator.',
+  delete: 'Dynamic memory (delete) is not supported by the simulator.',
+  template: 'Templates are not supported by the simulator.',
+  namespace: 'namespace is not supported by the simulator.',
 };
 
 const BIN_PREC = {
@@ -76,18 +76,18 @@ export class Parser {
   expect(v, hint) {
     if (this.accept(v)) return this.prev();
     const defaults = {
-      ';': 'Qator oxirida nuqta-vergul (;) qo‘yilmagan.',
-      ')': 'Qavs yopilmagan — “)” yetishmayapti.',
-      '(': '“(” qavs kutilgan edi.',
-      '}': 'Figurali qavs yopilmagan — “}” yetishmayapti.',
-      ']': 'Kvadrat qavs yopilmagan — “]” yetishmayapti.',
+      ';': 'A semicolon (;) is missing at the end of the line.',
+      ')': 'A parenthesis is not closed — “)” is missing.',
+      '(': 'An opening “(” was expected here.',
+      '}': 'A curly brace is not closed — “}” is missing.',
+      ']': 'A square bracket is not closed — “]” is missing.',
     };
     throw this.expected(`'${v}'`, hint ?? defaults[v]);
   }
 
   identifier(hint) {
     const t = this.peek();
-    if (t.t !== 'id') throw this.expected('unqualified-id', hint ?? 'Bu yerda nom (o‘zgaruvchi yoki funksiya nomi) kutilgan edi.');
+    if (t.t !== 'id') throw this.expected('unqualified-id', hint ?? 'A name (variable or function) was expected here.');
     this.i++;
     return t;
   }
@@ -135,14 +135,14 @@ export class Parser {
     }
     if (!words.length) {
       const t = this.peek();
-      if (t.t === 'id') throw this.err(t, `'${t.v}' does not name a type`, `“${t.v}” turi noma’lum. Kutubxona #include qilinganini yoki yozilishini tekshiring.`);
+      if (t.t === 'id') throw this.err(t, `'${t.v}' does not name a type`, `Unknown type “${t.v}”. Check the spelling or that its library is #included.`);
       throw this.expected('type-specifier');
     }
     while (this.is('const')) { this.i++; isConst = true; }
     let ptr = 0;
     while (this.is('*')) { this.i++; ptr++; while (this.accept('const')); }
     if (this.is('&')) {
-      throw this.err(this.peek(), 'references are not supported by the NAFAS simulator', 'Havolalar (&) simulyatorda qo‘llab-quvvatlanmaydi — qiymatni return orqali qaytaring yoki global o‘zgaruvchi ishlating.');
+      throw this.err(this.peek(), 'references are not supported by the NAFAS simulator', 'References (&) are not supported — return the value or use a global variable.');
     }
     return { words, isConst, isStatic, ptr, line: start.line, col: start.col };
   }
@@ -156,12 +156,12 @@ export class Parser {
       if (!this.isTypeStart()) {
         const t = this.peek();
         if (t.t === 'id' && (this.peek(1).t === 'id')) {
-          throw this.err(t, `'${t.v}' does not name a type`, `“${t.v}” turi noma’lum. Harflar katta-kichikligini yoki kerakli #include ni tekshiring.`);
+          throw this.err(t, `'${t.v}' does not name a type`, `Unknown type “${t.v}”. Check upper/lower case or the #include you need.`);
         }
         if (t.t === 'id') {
-          throw this.err(t, `'${t.v}' does not name a type`, 'Buyruqlar faqat funksiya ichida (masalan, setup() yoki loop() ichida) yozilishi mumkin.');
+          throw this.err(t, `'${t.v}' does not name a type`, 'Statements can only be written inside a function, for example inside setup() or loop().');
         }
-        if (t.v === '}') throw this.err(t, "expected declaration before '}' token", 'Ortiqcha “}” qavs bor.');
+        if (t.v === '}') throw this.err(t, "expected declaration before '}' token", 'There is an extra “}”.');
         throw this.err(t, `expected unqualified-id before ${describeToken(t)}`);
       }
       decls.push(this.parseDeclaration(true));
@@ -178,7 +178,7 @@ export class Parser {
       if (topLevel && !isClass) return this.parseFunction(type, nameTok);
       if (!topLevel && !isClass && this.looksLikeParamList()) {
         throw this.err(nameTok, `a function-definition is not allowed here before '{' token`,
-          'Funksiya boshqa funksiya ichida e’lon qilinmaydi. Ehtimol, oldingi funksiyada “}” qavs yopilmagan.');
+          'A function cannot be declared inside another function. The previous function is probably missing its “}”.');
       }
     }
     const declarators = [];
@@ -189,7 +189,7 @@ export class Parser {
       first = this.identifier();
     }
     if (!this.is(';')) {
-      throw this.expected(declarators.length ? "',' or ';'" : "';'", 'O‘zgaruvchi e’lonidan keyin nuqta-vergul (;) qo‘yilmagan.');
+      throw this.expected(declarators.length ? "',' or ';'" : "';'", 'A semicolon (;) is missing after the variable declaration.');
     }
     this.i++;
     return { k: 'var', type, declarators, line: type.line, col: type.col };
@@ -246,7 +246,7 @@ export class Parser {
       do {
         if (!this.isTypeStart()) {
           const t = this.peek();
-          if (t.t === 'id') throw this.err(t, `'${t.v}' has not been declared`, 'Funksiya parametrining turi ko‘rsatilmagan (masalan, int son).');
+          if (t.t === 'id') throw this.err(t, `'${t.v}' has not been declared`, 'The parameter has no type (for example: int value).');
           throw this.expected('primary-expression');
         }
         const ptype = this.parseType();
@@ -269,7 +269,7 @@ export class Parser {
     const fn = { k: 'func', ret, name: nameTok.v, params, body: null, line: nameTok.line, col: nameTok.col };
     if (this.accept(';')) return fn;
     if (!this.is('{')) {
-      throw this.expected("'{'", 'Funksiya sarlavhasidan keyin { ... } tanasi yoki ; bo‘lishi kerak.');
+      throw this.expected("'{'", 'A function header must be followed by a { ... } body or a ;.');
     }
     fn.body = this.parseBlock();
     return fn;
@@ -282,7 +282,7 @@ export class Parser {
     while (!this.is('}')) {
       if (this.peek().t === 'eof') {
         throw new CompileError(this.prev().line, this.prev().end, "expected '}' at end of input",
-          `${open.line}-qatordagi “{” qavs yopilmagan — oxiriga “}” qo‘shing.`);
+          `The “{” opened on line ${open.line} is never closed — add “}” at the end.`);
       }
       body.push(this.parseStatement());
     }
@@ -310,7 +310,7 @@ export class Parser {
           return { k: 'if', c, then, other, line: t.line, col: t.col };
         }
         case 'else':
-          throw this.err(t, "'else' without a previous 'if'", 'else dan oldin if bo‘lishi kerak. Ehtimol, if dan keyin ortiqcha “;” qo‘yilgan.');
+          throw this.err(t, "'else' without a previous 'if'", 'else needs an if before it. There may be a stray “;” after the if.');
         case 'while': {
           this.i++;
           this.expect('(');
@@ -335,9 +335,9 @@ export class Parser {
           let init = null;
           if (this.accept(';')) init = null;
           else if (this.isTypeStart()) init = this.parseDeclaration(false);
-          else { init = { k: 'expr', e: this.parseExpr() }; this.expect(';', 'for (boshlanish; shart; qadam) — qismlar nuqta-vergul bilan ajratiladi.'); }
+          else { init = { k: 'expr', e: this.parseExpr() }; this.expect(';', 'for (init; condition; step) — the three parts are separated by semicolons.'); }
           const c = this.is(';') ? null : this.parseExpr();
-          this.expect(';', 'for (boshlanish; shart; qadam) — qismlar nuqta-vergul bilan ajratiladi.');
+          this.expect(';', 'for (init; condition; step) — the three parts are separated by semicolons.');
           const upd = this.is(')') ? null : this.parseExpr();
           this.expect(')');
           return { k: 'for', init, c, upd, body: this.parseStatement(), line: t.line, col: t.col };
@@ -359,7 +359,7 @@ export class Parser {
               this.expect(':');
               cases.push({ test: null, body: [] });
             } else {
-              if (!cases.length) throw this.err(this.peek(), 'statement in switch before any case label', 'switch ichida avval case yozilishi kerak.');
+              if (!cases.length) throw this.err(this.peek(), 'statement in switch before any case label', 'Inside switch the first thing must be a case label.');
               cases[cases.length - 1].body.push(this.parseStatement());
             }
           }
@@ -390,7 +390,7 @@ export class Parser {
     }
     const e = this.parseExpr();
     if (!this.is(';')) {
-      throw this.expected("';'", 'Buyruq oxirida nuqta-vergul (;) qo‘yilmagan.');
+      throw this.expected("';'", 'A semicolon (;) is missing at the end of the statement.');
     }
     this.i++;
     return { k: 'expr', e, line: t.line, col: t.col };
@@ -454,7 +454,7 @@ export class Parser {
         return { k: 'un', op: t.v, e: this.parseUnary(), line: t.line, col: t.col };
       }
       if (t.v === '&' || t.v === '*') {
-        throw this.err(t, 'pointers are not supported by the NAFAS simulator', 'Ko‘rsatkichlar (& va *) simulyatorda qo‘llab-quvvatlanmaydi.');
+        throw this.err(t, 'pointers are not supported by the NAFAS simulator', 'Pointers (& and *) are not supported by the simulator.');
       }
       if (t.v === '(' && this.isTypeStart(1)) {
         // C-style cast: (type) expr
@@ -537,6 +537,6 @@ export class Parser {
     }
     if (t.t === 'eof') throw this.expected('primary-expression');
     throw this.err(t, `expected primary-expression before ${describeToken(t)}`,
-      t.v === ')' ? 'Qavs ichida ifoda yetishmayapti.' : 'Bu yerda qiymat yoki ifoda kutilgan edi.');
+      t.v === ')' ? 'An expression is missing inside the parentheses.' : 'A value or an expression was expected here.');
   }
 }

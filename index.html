@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="uz">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>NAFAS Laboratoriya</title>
-  <meta name="description" content="NAFAS Nano virtual Arduino laboratoriyasi" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='6' y='6' width='52' height='52' rx='16' fill='%230f1a1d'/><circle cx='32' cy='32' r='15' fill='none' stroke='%232dd4bf' stroke-width='5'/></svg>" />
+  <title>NAFAS Lab</title>
+  <meta name="description" content="NAFAS Nano — virtual Arduino laboratory" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><defs><radialGradient id='g' cx='50%' cy='80%' r='70%'><stop offset='0' stop-color='%23c6f432'/><stop offset='1' stop-color='%23050606'/></radialGradient></defs><circle cx='32' cy='32' r='28' fill='url(%23g)'/></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -13,93 +13,91 @@
 </head>
 <body>
   <div class="app">
-    <!-- icon rail -->
-    <nav class="rail" aria-label="Bo‘limlar">
-      <a class="rail-logo" href="#room" title="NAFAS"><span class="ring"></span></a>
-      <span class="rail-sep"></span>
-      <a class="rail-btn active" href="#room" data-nav="room" title="Xona">
-        <svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z" /></svg>
-      </a>
-      <a class="rail-btn" href="#circuit" data-nav="circuit" title="Qurilma sxemasi">
-        <svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4" /></svg>
-      </a>
-      <a class="rail-btn" href="#ide" data-nav="ide" title="Kod">
-        <svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16" /></svg>
-      </a>
-      <a class="rail-btn" href="#serial" data-nav="serial" title="Serial Monitor">
-        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2" /><path d="M7 9l3 2-3 2M12 14h5M8 21h8" /></svg>
-      </a>
-      <span class="rail-fill"></span>
-      <span class="rail-vert">NAFAS · VIRTUAL LAB</span>
-      <button class="rail-btn" id="soundToggle" title="Ovoz">
-        <svg viewBox="0 0 24 24" class="snd-on"><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" /></svg>
-        <svg viewBox="0 0 24 24" class="snd-off"><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 9l5 6M21 9l-5 6" /></svg>
-      </button>
-    </nav>
-
-    <!-- side panel -->
     <aside class="side">
-      <div class="side-head">
-        <div class="unit"><span class="unit-ring" id="unitLed"></span></div>
-        <div class="unit-txt">
+      <div class="brand">
+        <div class="orb" id="unitOrb" aria-hidden="true"><span class="orb-core"></span><span class="orb-ring"></span></div>
+        <div class="brand-txt">
           <b>NAFAS Nano</b>
           <span id="unitBoard">Arduino Uno</span>
         </div>
       </div>
 
       <section class="side-sec">
-        <div class="sec-title"><span>Tajriba</span><button class="sec-act" id="resetWorld" title="Xonani boshlang‘ich holatga qaytarish"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v5h5" /></svg></button></div>
-        <button class="item eq" data-eq="heater"><span class="ico heat"><svg viewBox="0 0 24 24"><path d="M6 20V8M10 20V6M14 20V6M18 20V8M4 20h16" /><path d="M9 4c0-1 1-1 1-2M13 4c0-1 1-1 1-2" /></svg></span><span class="name">Isitkich</span><span class="tgl"></span></button>
-        <button class="item eq" data-eq="propaneLeak"><span class="ico propane"><svg viewBox="0 0 24 24"><rect x="7" y="8" width="10" height="13" rx="4" /><path d="M10 8V5h4v3" /></svg></span><span class="name">Propan sizishi</span><span class="tgl"></span></button>
-        <button class="item eq" data-eq="methaneLeak"><span class="ico methane"><svg viewBox="0 0 24 24"><path d="M3 6h13v14M16 12h5" /><circle cx="16" cy="12" r="2.4" /></svg></span><span class="name">Metan sizishi</span><span class="tgl"></span></button>
-        <button class="item eq" data-eq="window"><span class="ico air"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M12 4v16M4 12h16" /></svg></span><span class="name">Deraza</span><span class="tgl"></span></button>
-        <button class="item eq" data-eq="motion"><span class="ico motion"><svg viewBox="0 0 24 24"><circle cx="13" cy="4.5" r="2" /><path d="M9 21l2.5-6-3-3 2-5 4 3 3 1M11.5 15l3.5 2v4" /></svg></span><span class="name">Xonada odam</span><span class="tgl"></span></button>
+        <div class="sec-title"><span>Environment</span><button class="link" id="resetWorld">Reset room</button></div>
+        <div class="pills">
+          <button class="pill" data-eq="heater" style="--c: var(--heat-2)">
+            <span class="check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4L18 8" /></svg></span>
+            <span class="pill-name">Heater</span>
+            <svg class="pill-ico" viewBox="0 0 24 24"><path d="M12 3c2 3 5 5 5 9a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 2 1 3 2 3 0-3 0-5 1-7.5z" /></svg>
+          </button>
+          <button class="pill" data-eq="propaneLeak" style="--c: var(--propane)">
+            <span class="check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4L18 8" /></svg></span>
+            <span class="pill-name">Propane leak</span>
+            <svg class="pill-ico" viewBox="0 0 24 24"><rect x="7" y="8" width="10" height="13" rx="4" /><path d="M10 8V5h4v3" /></svg>
+          </button>
+          <button class="pill" data-eq="methaneLeak" style="--c: var(--methane)">
+            <span class="check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4L18 8" /></svg></span>
+            <span class="pill-name">Methane leak</span>
+            <svg class="pill-ico" viewBox="0 0 24 24"><path d="M3 6h13v14M16 12h5" /><circle cx="16" cy="12" r="2.4" /></svg>
+          </button>
+          <button class="pill" data-eq="window" style="--c: var(--air)">
+            <span class="check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4L18 8" /></svg></span>
+            <span class="pill-name">Window open</span>
+            <svg class="pill-ico" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M12 4v16M4 12h16" /></svg>
+          </button>
+        </div>
       </section>
 
       <section class="side-sec">
-        <div class="sec-title"><span>Misollar</span></div>
+        <div class="sec-title"><span>Examples</span></div>
         <div id="examplesList"></div>
       </section>
 
       <section class="side-sec grow">
-        <div class="sec-title"><span>Oxirgi kodlar</span><span class="count" id="recentCount">0</span></div>
+        <div class="sec-title"><span>Recent sketches</span><span class="count" id="recentCount">0</span></div>
         <div id="recentList"></div>
       </section>
+
+      <button class="sound" id="soundToggle">
+        <svg viewBox="0 0 24 24" class="snd-on"><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" /></svg>
+        <svg viewBox="0 0 24 24" class="snd-off"><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 9l5 6M21 9l-5 6" /></svg>
+        <span class="snd-txt">Sound on</span>
+      </button>
     </aside>
 
     <main class="main">
-      <!-- the laboratory room -->
       <section class="stage" id="room">
         <canvas id="roomCanvas"></canvas>
         <div class="stage-tools">
-          <button class="tool" id="focusDevice" title="Qurilmaga yaqinlashish"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5M11 8v6M8 11h6" /></svg></button>
-          <button class="tool" id="resetView" title="Butun xona"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg></button>
+          <button class="tool" id="focusDevice" title="Zoom to the device"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6" /><path d="M20 20l-4.5-4.5M11 8v6M8 11h6" /></svg></button>
+          <button class="tool" id="resetView" title="Whole room"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg></button>
         </div>
-        <div class="readings" id="sensors">
-          <div class="metric" data-m="temperature">
-            <div class="m-row"><span class="m-name"><i class="sw temp"></i>Harorat</span><span class="m-badge" data-badge></span></div>
-            <div class="m-val"><b data-v>24.0</b><span>°C</span><small data-sub></small></div>
-            <div class="spark"><canvas></canvas><div class="spark-tip"></div></div>
+        <div class="gauges" id="sensors">
+          <div class="gauge" data-m="temperature" style="--c1: var(--heat-1); --c2: var(--heat-2); --c3: var(--heat-3)">
+            <svg class="ticks" viewBox="0 0 200 200"></svg>
+            <div class="glass"><div class="fire"></div></div>
+            <div class="g-read"><b data-v>24.0</b><span>°C</span></div>
+            <div class="g-label">Temperature</div>
           </div>
-          <div class="metric" data-m="propane">
-            <div class="m-row"><span class="m-name"><i class="sw propane"></i>Propan</span><span class="m-badge" data-badge></span></div>
-            <div class="m-val"><b data-v>0</b><span>ppm</span><small data-sub></small></div>
-            <div class="spark"><canvas></canvas><div class="spark-tip"></div></div>
+          <div class="gauge" data-m="propane" style="--c1: #d9ccff; --c2: var(--propane); --c3: #5b2de0">
+            <svg class="ticks" viewBox="0 0 200 200"></svg>
+            <div class="glass"><div class="fire"></div></div>
+            <div class="g-read"><b data-v>0</b><span>ppm</span></div>
+            <div class="g-label">Propane</div>
           </div>
-          <div class="metric" data-m="methane">
-            <div class="m-row"><span class="m-name"><i class="sw methane"></i>Metan</span><span class="m-badge" data-badge></span></div>
-            <div class="m-val"><b data-v>0</b><span>ppm</span><small data-sub></small></div>
-            <div class="spark"><canvas></canvas><div class="spark-tip"></div></div>
+          <div class="gauge" data-m="methane" style="--c1: #c8f3ff; --c2: var(--methane); --c3: #1063e0">
+            <svg class="ticks" viewBox="0 0 200 200"></svg>
+            <div class="glass"><div class="fire"></div></div>
+            <div class="g-read"><b data-v>0</b><span>ppm</span></div>
+            <div class="g-label">Methane</div>
           </div>
-          <div class="io-row">
-            <span class="io" id="ioBuzzer" title="Buzzer"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 9a4 4 0 0 1 0 6" /></svg></span>
-            <span class="io" id="ioLed" title="LED"><i></i></span>
-            <span class="io" id="ioPir" title="PIR"><svg viewBox="0 0 24 24"><circle cx="13" cy="4.5" r="2" /><path d="M9 21l2.5-6-3-3 2-5 4 3 3 1" /></svg></span>
+          <div class="signals">
+            <span class="sig" id="ioBuzzer" title="Buzzer"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" /></svg></span>
+            <span class="sig" id="ioLed" title="Alarm LED"><i></i></span>
           </div>
         </div>
       </section>
 
-      <!-- Wokwi-style workbench -->
       <section class="bench" id="ide">
         <div class="bench-bar">
           <div class="files">
@@ -108,11 +106,11 @@
             <button class="file" data-file="libraries">libraries.txt</button>
           </div>
           <div class="bench-actions">
-            <select id="boardSelect" title="Plata"></select>
-            <span class="sim-time" id="simTime" title="Simulyatsiya vaqti">00:00.000</span>
+            <select id="boardSelect" title="Board"></select>
+            <span class="sim-time" id="simTime" title="Simulation time">00:00.000</span>
             <button class="act verify" id="btnVerify" title="Verify (Ctrl+R)"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg></button>
-            <button class="act run" id="btnUpload" title="Upload va ishga tushirish (Ctrl+U)"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" /></svg></button>
-            <button class="act stop" id="btnStop" title="To‘xtatish"><svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5" /></svg></button>
+            <button class="act run" id="btnUpload" title="Upload and run (Ctrl+U)"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z" /></svg></button>
+            <button class="act stop" id="btnStop" title="Stop"><svg viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="1.5" /></svg></button>
           </div>
         </div>
         <div class="bench-body">
@@ -127,21 +125,21 @@
               <div class="console-tabs">
                 <button class="ctab active" data-tab="serial">Serial Monitor <i class="new-dot"></i></button>
                 <button class="ctab" data-tab="output">Output <i class="new-dot"></i></button>
-                <button class="ctab-clear" id="btnClear" title="Tozalash"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13" /></svg></button>
+                <button class="ctab-clear" id="btnClear" title="Clear"><svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13" /></svg></button>
               </div>
               <div class="cpane active" id="paneSerial">
                 <div class="serial-out" id="serialOut"></div>
                 <div class="serial-bar">
-                  <input id="serialInput" placeholder="Xabar yuborish (Enter)" autocomplete="off" />
-                  <select id="lineEnding" title="Qator oxiri">
-                    <option value="">No Line Ending</option>
-                    <option value="\n" selected>New Line</option>
-                    <option value="\r">Carriage Return</option>
+                  <input id="serialInput" placeholder="Send message (Enter)" autocomplete="off" />
+                  <select id="lineEnding" title="Line ending">
+                    <option value="">No line ending</option>
+                    <option value="\n" selected>New line</option>
+                    <option value="\r">Carriage return</option>
                     <option value="\r\n">Both NL &amp; CR</option>
                   </select>
-                  <select id="baud" title="Tezlik"></select>
+                  <select id="baud" title="Baud rate"></select>
                   <button class="tog on" id="autoscroll" title="Autoscroll"><svg viewBox="0 0 24 24"><path d="M12 4v14M6 12l6 6 6-6M5 21h14" /></svg></button>
-                  <button class="tog" id="timestamps" title="Vaqt belgisi"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></svg></button>
+                  <button class="tog" id="timestamps" title="Timestamps"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" /><path d="M12 7v5l3 2" /></svg></button>
                 </div>
               </div>
               <div class="cpane" id="paneOutput"><pre id="output"></pre></div>
