@@ -7,7 +7,7 @@ import { EXAMPLES, exampleCode } from './sim/examples.js';
 import { createEditor } from './ui/editor.js';
 import { Buzzer } from './ui/audio.js';
 import { createCircuit } from './ui/circuit.js';
-import { icon, glyph } from './ui/icons.js';
+import { icon } from './ui/icons.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -84,7 +84,6 @@ function ledLevel() {
 
 // ---------------------------------------------------------------- reading tiles
 for (const el of $$('[data-icon]')) el.innerHTML = icon(el.dataset.icon);
-for (const el of $$('[data-glyph]')) el.innerHTML = glyph(el.dataset.glyph, el.dataset.glyph);
 const TILES = {
   temperature: { min: 18, max: 70, over: (v) => v > 40, fmt: (v) => v.toFixed(1), sub: () => `Humidity ${Math.round(world.humidity)}%` },
   propane: { min: 0, max: 1200, over: (v) => v > 700, fmt: (v) => String(Math.round(v)), sub: (v) => gasNote(v, 'propane') },

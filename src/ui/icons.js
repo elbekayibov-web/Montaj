@@ -14,11 +14,3 @@ export const ICON_PATHS = {
 export function icon(name, cls = 'ic') {
   return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
 }
-
-// Filled glyph with a vertical gradient, used large on the reading tiles.
-export function glyph(name, id) {
-  const shapes = ICON_PATHS[name].replace(/ class="line"/g, ' class="cut"');
-  return `<svg class="t-glyph" viewBox="0 0 24 24" aria-hidden="true">
-    <defs><linearGradient id="g-${id}" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="var(--g1)"/><stop offset="1" stop-color="var(--g2)"/></linearGradient></defs>
-    <g fill="url(#g-${id})">${shapes}</g></svg>`;
-}

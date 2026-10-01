@@ -47,11 +47,9 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
-  // Soft aurora drifting around the house. It lives on a sphere drawn at
-  // infinite depth, so it reads as far-away light from every camera angle.
+  // Quiet backdrop: a dark gradient with a faint cool glow low on the horizon.
   scene.background = new THREE.Color(0x010203);
-  const auroraMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
+  const backdropMat = new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
     depthTest: false,
@@ -63,32 +61,18 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
         gl_Position = p.xyww;
       }`,
     fragmentShader: `
-      uniform float uTime;
       varying vec3 vDir;
-      vec3 ribbon(float az, float el, float k, vec3 color) {
-        float t = uTime;
-        float center = -0.34 + k * 0.13 + 0.13 * sin(az * 1.4 + t * 0.045 + k * 2.1) + 0.06 * sin(az * 3.3 - t * 0.06 + k);
-        float width = 0.035 + 0.02 * sin(az * 2.1 + t * 0.03 + k * 1.7);
-        float band = exp(-pow((el - center) / width, 2.0));
-        float folds = 0.55 + 0.45 * sin(az * 7.0 + el * 5.0 + t * 0.25 + k * 3.0);
-        float fade = 0.6 + 0.4 * sin(t * 0.12 + k * 2.4);
-        return color * band * folds * fade;
-      }
       void main() {
         vec3 d = normalize(vDir);
-        float az = atan(d.z, d.x);
-        float el = d.y;
-        vec3 col = vec3(0.003, 0.005, 0.01);
-        col += ribbon(az, el, 0.0, vec3(0.10, 0.20, 0.95)) * 0.16;
-        col += ribbon(az + 1.3, el, 1.0, vec3(0.30, 0.14, 0.85)) * 0.1;
-        col += ribbon(az - 0.8, el, 2.0, vec3(0.02, 0.55, 0.62)) * 0.11;
+        float glow = exp(-pow((d.y + 0.25) / 0.45, 2.0));
+        vec3 col = mix(vec3(0.004, 0.005, 0.007), vec3(0.006, 0.01, 0.018), glow);
         gl_FragColor = vec4(col, 1.0);
       }`,
   });
-  const aurora = new THREE.Mesh(new THREE.SphereGeometry(60, 64, 32), auroraMat);
-  aurora.renderOrder = -10;
-  aurora.frustumCulled = false;
-  scene.add(aurora);
+  const backdrop = new THREE.Mesh(new THREE.SphereGeometry(60, 48, 24), backdropMat);
+  backdrop.renderOrder = -10;
+  backdrop.frustumCulled = false;
+  scene.add(backdrop);
   new EXRLoader().load(apartmentHDR, (tex) => {
     const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromEquirectangular(tex).texture;
@@ -740,7 +724,6 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     lastNow = now;
     elapsed += dt;
     const t = elapsed;
-    auroraMat.uniforms.uTime.value = t;
     if (tween) {
       const u = Math.min(1, (performance.now() - tween.start) / 1000 / tween.dur);
       const k = THREE.MathUtils.smootherstep(u, 0, 1);

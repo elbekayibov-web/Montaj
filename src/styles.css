@@ -94,10 +94,10 @@ svg { width: 1em; height: 1em; flex: none; }
 .pill-ico { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: var(--surface-3); color: var(--ink-3); transition: 0.35s var(--ease); }
 .side .ic, .ic { width: 18px; height: 18px; fill: currentColor; fill-opacity: 0.16; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .side .ic .line, .ic .line { fill: none; }
-.pill.on { border-color: var(--lime); color: var(--ink); background: linear-gradient(90deg, var(--lime-dim), transparent 70%); box-shadow: 0 0 0 3px rgba(94, 234, 255, 0.06), 0 10px 30px -14px var(--lime-glow); }
+.pill.on { border-color: var(--lime); color: var(--ink); background: linear-gradient(90deg, var(--lime-dim), transparent 70%); }
 .pill.on .check { background: var(--lime); border-color: var(--lime); color: #00161c; box-shadow: 0 0 14px var(--lime-glow); }
 .pill.on .check svg { stroke-width: 2.6; }
-.pill.on .pill-ico { color: var(--lime); background: var(--lime-dim); box-shadow: 0 0 18px -4px var(--lime-glow); }
+.pill.on .pill-ico { color: var(--lime); background: var(--lime-dim); }
 .pill.on .ic { fill-opacity: 0.28; }
 
 /* example + recent lists */
@@ -131,40 +131,32 @@ svg { width: 1em; height: 1em; flex: none; }
 .tool:hover { color: var(--lime); border-color: rgba(94, 234, 255, 0.5); box-shadow: 0 0 20px -6px var(--lime-glow); }
 
 /* ---------------- reading tiles ---------------- */
-.readings { position: absolute; right: 18px; bottom: 18px; display: flex; align-items: flex-end; gap: 12px; }
+.readings { position: absolute; right: 18px; bottom: 18px; display: flex; align-items: stretch; gap: 10px; }
 .tile {
   --lv: 0;
-  --a: #7cf0ff; --a2: rgba(150, 230, 255, 0.72); --g1: #7ff7ff; --g2: #1f5bff;
-  --bg1: #0a1a44; --bg2: #030817; --edge: rgba(90, 160, 255, 0.45); --halo: rgba(40, 110, 255, 0.55);
-  position: relative; width: 196px; height: 148px; padding: 18px 18px 16px; border-radius: 30px; overflow: hidden;
-  display: flex; flex-direction: column; justify-content: flex-start;
-  background: radial-gradient(120% 90% at 85% 75%, color-mix(in srgb, var(--g2) calc(10% + var(--lv) * 25%), transparent), transparent 60%), linear-gradient(160deg, var(--bg1), var(--bg2) 70%);
-  border: 1px solid var(--edge);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 24px rgba(60, 130, 255, 0.18), 0 22px 44px -22px var(--halo);
-  transition: box-shadow 0.6s var(--ease), border-color 0.6s, background 0.6s;
+  width: 168px; padding: 14px 15px 13px; border-radius: 18px; display: flex; flex-direction: column; gap: 8px;
+  background: rgba(10, 13, 15, 0.78); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--line-2); transition: border-color 0.4s;
 }
-.tile::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.07) 48%, transparent 60%); background-size: 260% 100%; animation: sheen 6s ease-in-out infinite; pointer-events: none; }
-@keyframes sheen { 0%, 60% { background-position: 130% 0; } 100% { background-position: -130% 0; } }
-.t-glyph-wrap { position: absolute; right: -16px; top: 4px; bottom: -14px; width: 116px; pointer-events: none; opacity: calc(0.42 + var(--lv) * 0.58); transition: opacity 0.6s; }
-.t-glyph { width: 100%; height: 100%; filter: drop-shadow(0 0 calc(4px + var(--lv) * 12px) var(--g1)); animation: glyphPulse 4s ease-in-out infinite; }
-.t-glyph .cut { fill: none; stroke: var(--bg2); stroke-width: 1.3; stroke-linecap: round; }
-@keyframes glyphPulse { 50% { filter: drop-shadow(0 0 calc(8px + var(--lv) * 18px) var(--g1)); } }
-.t-val { position: relative; display: flex; align-items: baseline; gap: 3px; color: var(--a); text-shadow: 0 0 18px color-mix(in srgb, var(--a) 55%, transparent); }
-.t-val b { font-size: 38px; font-weight: 600; letter-spacing: -0.045em; line-height: 1; font-variant-numeric: tabular-nums; }
-.t-val span { font-size: 15px; font-weight: 500; }
-.t-name { position: relative; margin-top: 6px; font-size: 14px; font-weight: 500; color: var(--a2); }
-.t-sub { position: relative; margin-top: auto; font-size: 12.5px; color: var(--a2); opacity: 0.85; max-width: 110px; }
-.tile.over {
-  --a: #ffd2a6; --a2: rgba(255, 196, 160, 0.78); --g1: #ffc46b; --g2: #ff2a14;
-  --bg1: #3a0c08; --bg2: #120302; --edge: rgba(255, 110, 70, 0.6); --halo: rgba(255, 60, 30, 0.7);
-  animation: tileAlarm 1.1s ease-in-out infinite;
-}
-@keyframes tileAlarm { 50% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 0 30px rgba(255, 80, 40, 0.3), 0 0 40px -6px rgba(255, 60, 30, 0.8); } }
+.t-head { display: flex; align-items: center; gap: 8px; }
+.t-ico { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-3); color: var(--ink-2); }
+.t-ico .ic { width: 15px; height: 15px; stroke-width: 1.6; fill-opacity: 0; }
+.t-name { font-size: 12.5px; color: var(--ink-2); }
+.t-val { display: flex; align-items: baseline; gap: 4px; }
+.t-val b { font-size: 30px; font-weight: 500; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; color: var(--ink); }
+.t-val span { font-size: 12.5px; color: var(--ink-3); }
+.t-bar { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.t-bar i { display: block; height: 100%; width: calc(var(--lv) * 100%); border-radius: 2px; background: var(--lime); transition: width 0.4s var(--ease), background 0.4s; }
+.t-sub { font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile.over { border-color: rgba(255, 90, 70, 0.45); }
+.tile.over .t-val b { color: #ff8f80; }
+.tile.over .t-bar i { background: #ff5a46; }
+.tile.over .t-ico { color: #ff8f80; background: rgba(255, 90, 70, 0.12); }
 .signals { display: flex; flex-direction: column; gap: 10px; padding-left: 4px; }
-.sig { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line-2); background: radial-gradient(circle at 50% 30%, #151918, #040505 75%); color: var(--ink-3); font-size: 18px; transition: 0.3s var(--ease); }
+.sig { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line-2); background: rgba(10, 13, 15, 0.78); color: var(--ink-3); font-size: 18px; transition: 0.3s var(--ease); }
 .sig i { width: 12px; height: 12px; border-radius: 50%; background: #3b1715; transition: 0.3s; }
-.sig.on { color: #ffd0cc; border-color: rgba(255, 59, 48, 0.6); box-shadow: 0 0 26px -4px rgba(255, 59, 48, 0.75); }
-.sig.on i { background: #ff4436; box-shadow: 0 0 14px #ff4436, 0 0 30px rgba(255, 68, 54, 0.6); }
+.sig.on { color: #ffb4ab; border-color: rgba(255, 90, 70, 0.5); }
+.sig.on i { background: #ff4436; box-shadow: 0 0 8px rgba(255, 68, 54, 0.7); }
 #ioBuzzer.on svg { animation: shake 0.22s infinite; }
 @keyframes shake { 0%, 100% { translate: 0 0; } 25% { translate: -1.5px 0; } 75% { translate: 1.5px 0; } }
 
@@ -269,9 +261,8 @@ svg { width: 1em; height: 1em; flex: none; }
 
 /* ---------------- responsive ---------------- */
 @media (max-width: 1320px) {
-  .tile { width: 168px; height: 132px; padding: 15px; border-radius: 26px; }
-  .t-val b { font-size: 31px; }
-  .t-glyph-wrap { width: 96px; }
+  .tile { width: 148px; }
+  .t-val b { font-size: 26px; }
 }
 @media (max-width: 1180px) {
   .app { grid-template-columns: 250px minmax(0, 1fr); }
@@ -287,12 +278,11 @@ svg { width: 1em; height: 1em; flex: none; }
   .stage { order: 1; height: 80vh; min-height: 500px; margin: 12px 12px 0; }
   .bench { order: 3; margin: 12px; }
   .readings { left: 10px; right: 10px; bottom: 10px; gap: 6px; }
-  .tile { flex: 1; min-width: 0; width: auto; height: 104px; padding: 11px 12px; border-radius: 20px; }
-  .t-val b { font-size: 22px; }
+  .tile { flex: 1; min-width: 0; width: auto; padding: 10px 11px; gap: 6px; border-radius: 14px; }
+  .t-val b { font-size: 21px; }
   .t-val span { font-size: 11px; }
-  .t-name { font-size: 11.5px; margin-top: 4px; }
+  .t-ico { display: none; }
   .t-sub { display: none; }
-  .t-glyph-wrap { width: 58px; right: -10px; }
   .signals { gap: 6px; }
   .sig { width: 34px; height: 34px; font-size: 15px; }
   .bench-bar { flex-wrap: wrap; }
