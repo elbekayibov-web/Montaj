@@ -191,20 +191,46 @@ svg { width: 1em; height: 1em; flex: none; }
 .aux { position: absolute; inset: 0; margin: 0; padding: 16px 20px; overflow: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.65; color: var(--ink-2); background: #070909; }
 .right { display: grid; grid-template-rows: minmax(0, 1.3fr) minmax(0, 1fr); min-width: 0; min-height: 0; }
 .circuit { position: relative; min-height: 0; background-color: #0c0e0e; background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px); background-size: 18px 18px; border-bottom: 1px solid var(--line); overflow: hidden; }
-.circuit-svg { width: 100%; height: 100%; display: block; }
-.circuit-svg .c-label, .circuit-svg .c-name { fill: #d8dfda; font: 600 12px var(--sans); }
-.circuit-svg .c-val { fill: var(--lime); font: 500 11px var(--mono); }
-.circuit-svg .c-pin { fill: #e8eef0; font: 600 8px var(--sans); }
-.circuit-svg .c-mark { fill: #3d4549; font: 700 10px var(--sans); }
-.circuit-svg .c-mark.dark { fill: #585f64; font-size: 11px; }
-.circuit-svg .c-board { fill: #dfe9ef; font: 600 8.5px var(--sans); }
-.circuit-svg .c-board.big { font-size: 13px; letter-spacing: 0.08em; }
-.circuit-svg .wire { opacity: 0.9; transition: filter 0.2s; }
-.circuit-svg .wire.hot { stroke: var(--lime); filter: drop-shadow(0 0 4px var(--lime)); }
-.circuit-svg .bz-waves path { opacity: 0; stroke: var(--lime); }
+.circuit-svg { width: 100%; height: 100%; display: block; cursor: grab; text-rendering: geometricPrecision; user-select: none; }
+.circuit-svg.grabbing { cursor: grabbing; }
+.circuit-svg text { font-family: var(--sans); }
+.circuit-svg .c-name { fill: #e8ecea; font-size: 13px; font-weight: 600; }
+.circuit-svg .c-val { fill: #8fd8e6; font-size: 11.5px; font-family: var(--mono); }
+.circuit-svg .c-pin { fill: #f1f4f6; font-size: 9.5px; font-weight: 700; }
+.circuit-svg .c-silk { fill: #eaf2f8; font-size: 9.5px; font-weight: 600; letter-spacing: 0.02em; }
+.circuit-svg .c-title { fill: #eaf2f8; font-size: 15px; font-weight: 700; letter-spacing: 0.14em; }
+.circuit-svg .c-rail { fill: #a1a8ad; font-size: 10.5px; font-weight: 700; }
+.circuit-svg .c-mark { fill: #3d4549; font-size: 12px; font-weight: 700; }
+.circuit-svg .c-mark-light { fill: #9aa2a8; font-size: 12px; font-weight: 700; }
+.circuit-svg .rail { stroke-width: 3; stroke-linecap: round; opacity: 0.85; }
+.circuit-svg .wire path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.circuit-svg .w-case { stroke: #050607; stroke-width: 5.5; }
+.circuit-svg .w-core { stroke-width: 3; }
+.circuit-svg .w-hit { stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
+.circuit-svg .w-end { stroke: #050607; stroke-width: 1.5; }
+.circuit-svg .wire.active .w-core { stroke-width: 4; stroke-dasharray: 10 6; animation: flow 0.6s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -16; } }
+.circuit-svg.dim .wire, .circuit-svg.dim .rail { opacity: 0.18; transition: opacity 0.15s; }
+.circuit-svg.dim .wire.focus { opacity: 1; }
+.circuit-svg .wire.focus .w-core { stroke-width: 4.5; }
+.circuit-svg .wire.focus .w-end { r: 5; }
+.circuit-svg .bz-waves path { opacity: 0; }
 .circuit-svg .bz-waves.on path { animation: wave 0.5s ease-out infinite; }
 @keyframes wave { from { opacity: 1; transform: translateX(-4px); } to { opacity: 0; transform: translateX(4px); } }
 .circuit-svg .button-part { cursor: pointer; }
+.cz { position: absolute; left: 10px; top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.cz button { height: 30px; min-width: 30px; padding: 0 9px; border-radius: 999px; border: 1px solid var(--line-2); background: rgba(10, 13, 15, 0.85); color: var(--ink-2); font-size: 14px; }
+.cz button:hover, .cz button.on { color: var(--ink); border-color: rgba(255, 255, 255, 0.25); }
+.cz .cz-list { font-size: 15px; }
+.c-tip { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 8px; padding: 7px 11px; border-radius: 10px; background: #f3f5f1; color: #0b0d0e; font-size: 12.5px; font-weight: 600; pointer-events: none; opacity: 0; transition: opacity 0.12s; white-space: nowrap; z-index: 3; }
+.c-tip.show { opacity: 1; }
+.c-tip i, .c-row i { width: 14px; height: 4px; border-radius: 2px; flex: none; }
+.c-list { position: absolute; top: 10px; right: 10px; bottom: 10px; width: 270px; overflow: auto; padding: 8px; border-radius: 14px; background: rgba(8, 10, 12, 0.94); border: 1px solid var(--line-2); font-size: 12px; z-index: 2; }
+.c-list-head { display: flex; justify-content: space-between; padding: 4px 6px 8px; font-weight: 600; color: var(--ink); }
+.c-list-head span { color: var(--ink-3); font-weight: 400; }
+.c-row { display: grid; grid-template-columns: 14px 1fr auto 1fr; align-items: center; gap: 7px; padding: 6px; border-radius: 8px; color: var(--ink-2); }
+.c-row b { color: var(--ink-3); font-weight: 400; }
+.c-row.on, .c-row:hover { background: var(--surface-3); color: var(--ink); }
 
 .console { display: flex; flex-direction: column; min-height: 0; background: #070909; }
 .console-tabs { display: flex; align-items: center; gap: 4px; padding: 6px 8px 0; border-bottom: 1px solid var(--line); }
