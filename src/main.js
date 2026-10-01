@@ -8,6 +8,7 @@ import { createEditor } from './ui/editor.js';
 import { Buzzer } from './ui/audio.js';
 import { createCircuit } from './ui/circuit.js';
 import { icon } from './ui/icons.js';
+import { createAssistant } from './ui/assistant.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -368,6 +369,8 @@ function formatProblem(p, sev) {
   return s;
 }
 output.addEventListener('click', (e) => {
+  const ask = e.target.closest('[data-ask]');
+  if (ask) { assistant.ask(ask.dataset.ask); return; }
   const l = e.target.closest('.errloc');
   if (l && +l.dataset.line) editor.goto(+l.dataset.line, +l.dataset.col);
 });
@@ -404,6 +407,7 @@ async function build(which) {
       editor.showProblems([{ line: e.line, col: e.col, message: e.message, hint: e.hint, severity: 'error' }]);
     }
     out(`\n<span class="err">exit status 1</span>\n\n<span class="err">Compilation error: ${esc(e.message)}</span>\n`);
+    out('<button class="ask-ai" data-ask="Why does my sketch not compile, and how do I fix it?">Ask the assistant</button>\n');
     showToast('Compilation error.', 100, true);
     return null;
   }
@@ -559,3 +563,17 @@ $('#serialInput').addEventListener('keydown', (e) => {
 // ---------------------------------------------------------------- initial state
 out('<span class="dim">Ctrl+R verify · Ctrl+U upload · Ctrl+S save\n</span>');
 serialOut.innerHTML = '<div class="serial-empty">Press ▶ — Serial.print() output appears here.</div>';
+
+// ---------------------------------------------------------------- AI assistant
+const assistant = createAssistant($('#assistant'), {
+  getContext: () => ({
+    code: editor.value,
+    fileName,
+    board: board.name,
+    running,
+    wiring: WIRING_INFO.map((w) => `${w.part} (${w.role}) → ${pinLabel(board, board.wiring[w.key])}`).join('\n'),
+    output: output.innerText,
+    serial: serialOut.innerText,
+    state: `temperature ${world.temperature.toFixed(1)} °C, humidity ${Math.round(world.humidity)}%, propane ${Math.round(world.propane)} ppm (ADC ${adcFor('propane')}), methane ${Math.round(world.methane)} ppm (ADC ${adcFor('methane')}); heater ${world.heater ? 'on' : 'off'}, propane leak ${world.propaneLeak ? 'on' : 'off'}, methane leak ${world.methaneLeak ? 'on' : 'off'}, window ${world.window ? 'open' : 'closed'}; buzzer ${buzzerLevel().freq ? 'sounding' : 'silent'}, LED ${ledLevel() > 0.3 ? 'on' : 'off'}.`,
+  }),
+});

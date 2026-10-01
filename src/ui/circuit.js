@@ -54,11 +54,12 @@ function labelToPin(label) {
 const POWER_LABELS = /^(GND|5V|3V3|3\.3V|VIN|RST|RESET|EN|IOREF|AREF|REF)$/;
 
 // Geometry (viewBox units)
-const VB = { w: 1000, h: 640 };
-const HOME = { x: 150, y: 0, w: 810, h: 640 };
-const B = { x: 230, y: 250, w: 540, h: 150 };
+const VB = { w: 1000, h: 830 };
+const HOME = { x: 140, y: 0, w: 830, h: 830 };
+const B = { x: 230, y: 250, w: 540, h: 300 };
 const PITCH = 24;
-const RAIL = { topV: 156, topG: 170, botG: 482, botV: 496 };
+const RAIL = { topV: 156, topG: 170, botG: 632, botV: 646 };
+const LANE = { top: 196, bot: 568 };
 
 const COLORS = {
   vcc: '#ef4444', gnd: '#6b7280',
@@ -122,7 +123,7 @@ export function createCircuit(host, { onButton } = {}) {
 
   function gasModule(key, cx) {
     // below the board, pins on top edge
-    const top = 528;
+    const top = 678;
     const g = el('g', { class: 'part', 'data-part': key }, gParts);
     el('rect', { x: cx - 52, y: top, width: 104, height: 80, rx: 6, fill: '#155d8b', stroke: '#0b3d5e', 'stroke-width': 1.5 }, g);
     el('circle', { cx, cy: top + 46, r: 22, fill: '#b87333' }, g);
@@ -136,7 +137,7 @@ export function createCircuit(host, { onButton } = {}) {
     parts[key] = { g, pins, pwr, val, signal: 'AO' };
   }
   function dht(cx) {
-    const top = 528;
+    const top = 678;
     const g = el('g', { class: 'part', 'data-part': 'dht' }, gParts);
     el('rect', { x: cx - 36, y: top, width: 72, height: 80, rx: 5, fill: '#f3f4f6', stroke: '#c7ccd1', 'stroke-width': 1.5 }, g);
     for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) el('rect', { x: cx - 26 + c * 14, y: top + 30 + r * 12, width: 9, height: 7, rx: 1, fill: '#aab1b8' }, g);
@@ -240,35 +241,101 @@ export function createCircuit(host, { onButton } = {}) {
 
   // ---------------------------------------------------------------- board
   let boardLeds = {};
+  // Header sits flush right like on a real Uno; returns x of the first pin.
+  const headerX0 = (n) => B.x + B.w - 46 - (n - 1) * PITCH;
+
   function drawBoard() {
     gBoard.innerHTML = '';
     pinPos.clear();
     const L = layout;
-    el('rect', { x: B.x, y: B.y, width: B.w, height: B.h, rx: 12, fill: L.color, stroke: L.edge, 'stroke-width': 2 }, gBoard);
+    const { x, y, w, h } = B;
+    const g = gBoard;
+    // outline with the bevelled right side of an Uno
+    el('path', { d: `M${x + 10} ${y} H${x + w - 28} L${x + w - 14} ${y + 14} V${y + 34} L${x + w} ${y + 48} V${h + y - 40} L${x + w - 14} ${y + h - 26} V${y + h - 10} Q${x + w - 14} ${y + h} ${x + w - 24} ${y + h} H${x + 10} Q${x} ${y + h} ${x} ${y + h - 10} V${y + 10} Q${x} ${y} ${x + 10} ${y} Z`, fill: L.color, stroke: L.edge, 'stroke-width': 2 }, g);
+    for (const [hx, hy] of [[x + 112, y + 16], [x + w - 30, y + 66], [x + w - 30, y + h - 54], [x + 100, y + h - 16]]) el('circle', { cx: hx, cy: hy, r: 8, fill: '#15181b' }, g);
+
     const header = (labels, top) => {
       const n = labels.length;
-      const x0 = B.x + B.w / 2 - ((n - 1) * PITCH) / 2;
-      const y = top ? B.y + 16 : B.y + B.h - 16;
-      el('rect', { x: x0 - 13, y: y - 10, width: (n - 1) * PITCH + 26, height: 20, rx: 3, fill: '#0e1012' }, gBoard);
+      const x0 = headerX0(n);
+      const hy = top ? y + 18 : y + h - 18;
+      // one black strip per group of pins (split at the gap)
+      let start = 0;
+      for (let i = 0; i <= n; i++) {
+        if (i === n || labels[i] === null) {
+          if (i > start) el('rect', { x: x0 + start * PITCH - 11, y: hy - 11, width: (i - start - 1) * PITCH + 22, height: 22, rx: 2, fill: '#1a1d20' }, g);
+          start = i + 1;
+        }
+      }
       labels.forEach((lab, i) => {
         if (!lab) return;
-        const x = x0 + i * PITCH;
-        el('rect', { x: x - 5, y: y - 5, width: 10, height: 10, rx: 1.5, fill: '#2b3035', stroke: '#565d63', 'stroke-width': 1 }, gBoard);
-        // vertical silkscreen label inside the board
-        const ty = top ? y + 18 : y - 18;
-        text(gBoard, x, ty, lab, 'c-silk', { transform: `rotate(-90 ${x} ${ty})`, 'text-anchor': top ? 'end' : 'start', 'dominant-baseline': 'middle' });
-        pinPos.set(lab + (pinPos.has(lab) ? `#${i}` : ''), { x, y: top ? y - 5 : y + 5, side: top ? 'top' : 'bottom', label: lab });
+        const px = x0 + i * PITCH;
+        el('rect', { x: px - 7, y: hy - 7, width: 14, height: 14, fill: '#3b4045' }, g);
+        el('rect', { x: px - 4, y: hy - 4, width: 8, height: 8, fill: '#08090a' }, g);
+        const ty = top ? hy + 18 : hy - 18;
+        text(g, px, ty, lab, 'c-silk', { transform: `rotate(-90 ${px} ${ty})`, 'text-anchor': top ? 'end' : 'start', 'dominant-baseline': 'central' });
+        pinPos.set(lab + (pinPos.has(lab) ? `#${i}` : ''), { x: px, y: top ? hy - 7 : hy + 7, side: top ? 'top' : 'bottom', label: lab });
       });
+      return x0;
     };
-    header(L.top, true);
-    header(L.bottom, false);
-    text(gBoard, B.x + B.w / 2, B.y + B.h / 2 + 5, L.title, 'c-title', { 'text-anchor': 'middle' });
-    el('rect', { x: B.x - 16, y: B.y + 22, width: 34, height: 40, rx: 3, fill: '#b9bec2', stroke: '#8c9298' }, gBoard); // USB
-    const onLed = el('circle', { cx: B.x + B.w - 40, cy: B.y + B.h / 2 - 14, r: 4.5, fill: '#08300f' }, gBoard);
-    const lLed = el('circle', { cx: B.x + B.w - 40, cy: B.y + B.h / 2 + 4, r: 4.5, fill: '#3a2606' }, gBoard);
-    text(gBoard, B.x + B.w - 30, B.y + B.h / 2 - 10, 'ON', 'c-silk');
-    text(gBoard, B.x + B.w - 30, B.y + B.h / 2 + 8, 'L', 'c-silk');
-    boardLeds = { onLed, lLed };
+    const tx0 = header(L.top, true);
+    const bx0 = header(L.bottom, false);
+
+    if (board.id === 'uno') {
+      // group captions
+      const gapTop = L.top.indexOf(null);
+      const dx1 = tx0 + (gapTop + 1) * PITCH - 10;
+      el('line', { x1: tx0 + 2 * PITCH - 8, y1: y + 68, x2: x + w - 36, y2: y + 68, stroke: '#ffffff', 'stroke-width': 1.5 }, g);
+      text(g, dx1 + 60, y + 84, 'DIGITAL (PWM ~)', 'c-silk-cap', { 'text-anchor': 'middle' });
+      const gapBot = L.bottom.indexOf(null);
+      el('line', { x1: bx0 - 8, y1: y + h - 66, x2: bx0 + (gapBot - 1) * PITCH + 8, y2: y + h - 66, stroke: '#ffffff', 'stroke-width': 1.5 }, g);
+      el('line', { x1: bx0 + (gapBot + 1) * PITCH - 8, y1: y + h - 66, x2: bx0 + (L.bottom.length - 1) * PITCH + 8, y2: y + h - 66, stroke: '#ffffff', 'stroke-width': 1.5 }, g);
+      text(g, bx0 + (gapBot - 1) * PITCH + 8, y + h - 72, 'POWER', 'c-silk-cap', { 'text-anchor': 'end' });
+      text(g, bx0 + (L.bottom.length - 1) * PITCH + 8, y + h - 72, 'ANALOG IN', 'c-silk-cap', { 'text-anchor': 'end' });
+      // USB-B, DC jack, reset, ICSP
+      el('rect', { x: x - 26, y: y + 34, width: 76, height: 58, rx: 2, fill: '#a9adb1', stroke: '#7d8388', 'stroke-width': 1.5 }, g);
+      el('rect', { x: x - 20, y: y + 40, width: 64, height: 46, fill: '#c4c8cb' }, g);
+      el('rect', { x: x - 18, y: y + h - 78, width: 62, height: 52, rx: 4, fill: '#0d0f10' }, g);
+      el('rect', { x: x + 44, y: y + h - 70, width: 6, height: 36, fill: '#26292c' }, g);
+      el('rect', { x: x + 30, y: y + 8, width: 28, height: 28, rx: 2, fill: '#c0c4c7' }, g);
+      el('circle', { cx: x + 44, cy: y + 22, r: 8, fill: '#a3161b' }, g);
+      for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++) el('circle', { cx: x + 76 + c * 10, cy: y + 42 + r * 10, r: 3.2, fill: '#b9bfc4', stroke: '#2a2e31' }, g);
+      // logo
+      const lx = x + 230;
+      const ly = y + 118;
+      el('circle', { cx: lx - 17, cy: ly, r: 16, fill: 'none', stroke: '#ffffff', 'stroke-width': 5 }, g);
+      el('circle', { cx: lx + 17, cy: ly, r: 16, fill: 'none', stroke: '#ffffff', 'stroke-width': 5 }, g);
+      el('rect', { x: lx - 23, y: ly - 1.5, width: 12, height: 3, fill: '#ffffff' }, g);
+      el('rect', { x: lx + 11, y: ly - 1.5, width: 12, height: 3, fill: '#ffffff' }, g);
+      el('rect', { x: lx + 15.5, y: ly - 6, width: 3, height: 12, fill: '#ffffff' }, g);
+      text(g, lx, ly + 34, 'ARDUINO', 'c-brand', { 'text-anchor': 'middle' });
+      el('rect', { x: lx + 48, y: ly - 18, width: 66, height: 34, rx: 7, fill: 'none', stroke: '#ffffff', 'stroke-width': 1.5 }, g);
+      text(g, lx + 81, ly + 7, 'UNO', 'c-uno', { 'text-anchor': 'middle' });
+      // ATmega328P
+      const cx0 = x + 250;
+      const cy0 = y + 158;
+      el('rect', { x: cx0, y: cy0, width: 250, height: 40, rx: 2, fill: '#202326' }, g);
+      for (let i = 0; i < 14; i++) {
+        el('rect', { x: cx0 + 10 + i * 17, y: cy0 - 4, width: 7, height: 4, fill: '#c9cdd0' }, g);
+        el('rect', { x: cx0 + 10 + i * 17, y: cy0 + 40, width: 7, height: 4, fill: '#c9cdd0' }, g);
+      }
+      el('circle', { cx: cx0 + 12, cy: cy0 + 20, r: 4, fill: '#121416' }, g);
+      text(g, cx0 + 140, cy0 + 24, 'ATMEGA328P', 'c-chip', { 'text-anchor': 'middle' });
+    } else {
+      text(g, x + w / 2, y + h / 2, L.title, 'c-uno', { 'text-anchor': 'middle' });
+      el('rect', { x: x + w / 2 - 70, y: y + h / 2 + 20, width: 140, height: 34, rx: 2, fill: '#202326' }, g);
+      el('rect', { x: x - 20, y: y + h / 2 - 22, width: 40, height: 44, rx: 3, fill: '#a9adb1' }, g);
+    }
+    // status LEDs (L, TX, RX, ON)
+    const led = (lx, ly, label, anchor) => {
+      const r = el('rect', { x: lx, y: ly, width: 14, height: 8, rx: 1.5, fill: '#e9ecee' }, g);
+      text(g, anchor === 'end' ? lx - 6 : lx + 20, ly + 4, label, 'c-silk-cap', { 'text-anchor': anchor, 'dominant-baseline': 'central' });
+      return r;
+    };
+    const lLed = led(x + 170, y + 92, 'L', 'end');
+    const txLed = led(x + 170, y + 112, 'TX', 'end');
+    led(x + 170, y + 126, 'RX', 'end');
+    const onLed = led(x + w - 92, y + 112, 'ON', 'start');
+    boardLeds = { onLed, lLed, txLed };
   }
 
   function findPin(predicate) {
@@ -318,8 +385,8 @@ export function createCircuit(host, { onButton } = {}) {
     };
     rail(RAIL.topV, COLORS.vcc, 180, 940, vName);
     rail(RAIL.topG, COLORS.gnd, 180, 940, 'GND');
-    rail(RAIL.botG, COLORS.gnd, 180, 760, 'GND');
-    rail(RAIL.botV, COLORS.vcc, 180, 760, vName);
+    rail(RAIL.botG, COLORS.gnd, 180, 790, 'GND');
+    rail(RAIL.botV, COLORS.vcc, 180, 790, vName);
 
     // feed the rails from the board's power pins
     const feed = (pin, railY, color, id, label) => {
@@ -367,13 +434,13 @@ export function createCircuit(host, { onButton } = {}) {
       const to = `${board.name} ${bp.label.replace(/[~←→]/g, '')}`;
       let pts;
       if (pp.side === bp.side) {
-        const y = pp.side === 'top' ? 196 + (laneTop++ % 6) * 8 : 418 + (laneBot++ % 6) * 8;
+        const y = pp.side === 'top' ? LANE.top + (laneTop++ % 6) * 8 : LANE.bot + (laneBot++ % 6) * 8;
         pts = [[pp.x, pp.y], [pp.x, y], [bp.x, y], [bp.x, bp.y]];
       } else {
         // around the right end of the board
         const x = B.x + B.w + 30 + (laneSide++ % 5) * 9;
-        const y1 = pp.side === 'top' ? 196 + (laneTop++ % 6) * 8 : 418 + (laneBot++ % 6) * 8;
-        const y2 = bp.side === 'top' ? 196 + (laneTop++ % 6) * 8 : 418 + (laneBot++ % 6) * 8;
+        const y1 = pp.side === 'top' ? LANE.top + (laneTop++ % 6) * 8 : LANE.bot + (laneBot++ % 6) * 8;
+        const y2 = bp.side === 'top' ? LANE.top + (laneTop++ % 6) * 8 : LANE.bot + (laneBot++ % 6) * 8;
         pts = [[pp.x, pp.y], [pp.x, y1], [x, y1], [x, y2], [bp.x, y2], [bp.x, bp.y]];
       }
       const w = addWire(`sig-${key}`, color, pts, from, to, `${from} → ${to}`);
@@ -475,8 +542,9 @@ export function createCircuit(host, { onButton } = {}) {
     setBoard,
     serialActivity() { txUntil = performance.now() + 120; },
     update(s) {
-      boardLeds.onLed?.setAttribute('fill', s.running ? '#39d353' : '#08300f');
-      boardLeds.lLed?.setAttribute('fill', s.pinValue(board.ledBuiltin) ? '#ffb020' : '#3a2606');
+      boardLeds.onLed?.setAttribute('fill', s.running ? '#3ee05a' : '#e9ecee');
+      boardLeds.lLed?.setAttribute('fill', s.pinValue(board.ledBuiltin) ? '#ffc21a' : '#e9ecee');
+      boardLeds.txLed?.setAttribute('fill', performance.now() < txUntil ? '#ffc21a' : '#e9ecee');
       parts.led.lens.setAttribute('fill', s.led > 0.05 ? '#ef4444' : '#7f1d1d');
       parts.buzzer.waves.classList.toggle('on', s.buzzer);
       for (const k of ['propane', 'methane']) {

@@ -74,3 +74,13 @@ metan shipga ko‘tariladi.
 - Gaz o‘lchov birligi va chegaralar: panelda virtual ppm, kod esa xom ADC qiymatini oladi.
 - Uy egasiga ogohlantirish yuborish usuli, 10 metr radius, ChatGPT/AI yordamchi — qo‘shilmagan.
 - Qo‘shilgan takliflar: grafiklar, qayta boshlash tugmasi, tayyor misollar, deraza, exploded 3D ko‘rinish.
+
+## AI yordamchi (ChatGPT)
+
+Sahifaning eng pastida **Assistant** bo‘limi bor. **Settings** tugmasini bosib OpenAI API kalitini kiriting
+(platform.openai.com → API keys). ChatGPT Plus obunasi API’ni o‘z ichiga olmaydi — API alohida to‘lanadi.
+Kalit faqat brauzeringizda (localStorage) saqlanadi va faqat ko‘rsatilgan API manziliga yuboriladi.
+
+Har bir savol bilan avtomatik yuboriladi: sketch (qator raqamlari bilan), ulanish sxemasi, kompilyator xatolari,
+Serial Monitor’ning oxirgi qatorlari, sensor qiymatlari va xona holati. Model va API manzilini ham o‘zgartirish mumkin
+(OpenAI bilan mos har qanday Chat Completions API).
