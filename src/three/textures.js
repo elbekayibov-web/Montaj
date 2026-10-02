@@ -406,17 +406,28 @@ export function wheatField(w = 1024, h = 640) {
 // Try the real painting from Wikimedia Commons (public domain); fall back to
 // the generated one if the network or the host's CSP blocks it.
 export function paintingTexture(url, fallback, aspect = 1) {
-  const tex = toTexture(fallback());
-  if (!url) return tex;
+  if (!url) return toTexture(fallback());
+  // A plain dark canvas until the image arrives; the generated painting is
+  // only drawn if the download fails, which keeps start-up fast.
+  const [blank, bg] = canvas(4, 4);
+  bg.fillStyle = '#2a2620';
+  bg.fillRect(0, 0, 4, 4);
+  const tex = toTexture(blank);
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.referrerPolicy = 'no-referrer';
   img.onload = () => {
+    tex.dispose(); // the GPU copy has the placeholder's size; re-upload at the new one
     tex.image = img;
     // cover-crop the real image into the frame
     const ia = img.width / img.height;
     if (ia > aspect) { tex.repeat.set(aspect / ia, 1); tex.offset.set((1 - aspect / ia) / 2, 0); }
     else { tex.repeat.set(1, ia / aspect); tex.offset.set(0, (1 - ia / aspect) / 2); }
+    tex.needsUpdate = true;
+  };
+  img.onerror = () => {
+    tex.dispose();
+    tex.image = fallback();
     tex.needsUpdate = true;
   };
   img.src = url;

@@ -11,7 +11,6 @@ import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { N8AOPass } from 'n8ao';
 import apartmentHDR from '@pmndrs/assets/hdri/apartment.exr.js';
 import { createDevice, glowTexture } from './device.js';
 import * as TX from './textures.js';
@@ -37,14 +36,29 @@ const at = (m, x, y, z) => { m.position.set(x, y, z); return m; };
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.7, ...o });
 const phys = (color, o = {}) => new THREE.MeshPhysicalMaterial({ color, roughness: 0.6, ...o });
 
+// Phones, tablets and weak laptops get a lighter pipeline: lower resolution,
+// no ambient occlusion or bloom, cheaper shadows and a 30 fps cap.
+const LOW = (() => {
+  try {
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    const small = Math.min(screen.width, screen.height) < 820;
+    const cores = navigator.hardwareConcurrency || 8;
+    return coarse || small || cores <= 4 || /[?&]lite\b/.test(location.search);
+  } catch { return false; }
+})();
+
 export function createRoom(canvasEl, { onDeviceClick } = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: false, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, LOW ? 1.25 : 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.AgXToneMapping;
   renderer.toneMappingExposure = 1.15;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  // The room is static, so shadow maps are only redrawn when something that
+  // casts a shadow moves (the window sashes) instead of on every frame.
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
 
   const scene = new THREE.Scene();
   // Quiet backdrop: a dark gradient with a faint cool glow low on the horizon.
@@ -339,7 +353,8 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
 
   // soft overhead light for the living area (no visible fixture)
   const roomLight = new THREE.PointLight(0xffc690, 5.5, 0, 2);
-  roomLight.castShadow = true;
+  // A point-light shadow is six extra renders; skip it on light devices.
+  roomLight.castShadow = !LOW;
   roomLight.shadow.mapSize.set(1024, 1024);
   roomLight.shadow.bias = -0.002;
   roomLight.shadow.radius = 8;
@@ -554,9 +569,11 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
   function stepGas(g, dt, kind, level, rate, src, venting) {
     g.acc += dt * rate;
     while (g.acc > 1) { g.acc -= 1; spawn(g, src, kind); }
+    let alive = 0;
     for (let i = 0; i < g.count; i++) {
       const q = g.p[i];
       if (!q.alive) { g.col[i * 4 + 3] = 0; continue; }
+      alive++;
       q.age += dt * (venting ? 2.4 : 1);
       if (q.age > q.life) { q.alive = false; g.col[i * 4 + 3] = 0; continue; }
       if (kind === 'propane') {
@@ -577,6 +594,7 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     }
     g.geo.attributes.position.needsUpdate = true;
     g.geo.attributes.color.needsUpdate = true;
+    return alive;
   }
 
   // ---------- lights ----------
@@ -585,7 +603,7 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
   moon.position.set(2.5, 7, -10);
   moon.target.position.set(1, 0, 0.5);
   moon.castShadow = true;
-  moon.shadow.mapSize.set(2048, 2048);
+  moon.shadow.mapSize.set(LOW ? 1024 : 2048, LOW ? 1024 : 2048);
   Object.assign(moon.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8, near: 1, far: 30 });
   moon.shadow.bias = -0.0004;
   moon.shadow.radius = 4;
@@ -670,22 +688,26 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
   });
 
   // ---------- post-processing ----------
+  // The plain render pass shows the room at once; on capable devices ambient
+  // occlusion (n8ao) is loaded afterwards and swapped in.
   const composer = new EffectComposer(renderer);
-  let aoPass = null;
-  try {
-    aoPass = new N8AOPass(scene, camera, 1, 1);
-    aoPass.configuration.aoRadius = 0.6;
-    aoPass.configuration.distanceFalloff = 0.3;
-    aoPass.configuration.intensity = 2.2;
-    aoPass.configuration.halfRes = true;
-    aoPass.configuration.gammaCorrection = false;
-    composer.addPass(aoPass);
-  } catch {
-    composer.addPass(new RenderPass(scene, camera));
-  }
-  const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.45, 0.6, 0.85);
-  composer.addPass(bloom);
+  const basePass = new RenderPass(scene, camera);
+  composer.addPass(basePass);
+  if (!LOW) composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.45, 0.6, 0.85));
   composer.addPass(new OutputPass());
+  if (!LOW) {
+    import('n8ao').then(({ N8AOPass }) => {
+      const aoPass = new N8AOPass(scene, camera, 1, 1);
+      aoPass.configuration.aoRadius = 0.6;
+      aoPass.configuration.distanceFalloff = 0.3;
+      aoPass.configuration.intensity = 2.2;
+      aoPass.configuration.halfRes = true;
+      aoPass.configuration.gammaCorrection = false;
+      composer.insertPass(aoPass, 0);
+      composer.removePass(basePass);
+      composer.setSize(w, h);
+    }).catch(() => { /* keep the plain render */ });
+  }
 
   let w = 1;
   let h = 1;
@@ -718,8 +740,20 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
   let tvAcc = 1;
   let windowOpen = 0;
   let raf;
+  let interacting = false;
+  let settling = false;
+  let gasAlive = 0;
+  controls.addEventListener('start', () => { interacting = true; });
+  controls.addEventListener('end', () => { interacting = false; });
   function frame(now) {
     raf = requestAnimationFrame(frame);
+    // Frame pacing: full rate while something moves (30 fps on light
+    // devices); a calm room only needs ~12 fps for the TV glow.
+    const busy = tween || interacting || settling || state.running || state.heater || state.heaterPower > 0.01
+      || state.propaneLeak || state.methaneLeak || state.buzzer > 0 || state.led > 0 || gasAlive > 0
+      || Math.abs((state.window ? 1 : 0) - windowOpen) > 0.002;
+    const gap = busy ? (LOW ? 1000 / 30 : 0) : 1000 / 12;
+    if (now - lastNow < gap - 2) return;
     const dt = Math.min(Math.max(0, (now - lastNow) / 1000), 0.05);
     lastNow = now;
     elapsed += dt;
@@ -731,7 +765,7 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
       controls.target.lerpVectors(tween.t0, tween.t1, k);
       if (u >= 1) tween = null;
     }
-    controls.update();
+    settling = controls.update(); // true while damping still moves the camera
     if (!visible) return;
 
     const hp = state.heaterPower;
@@ -740,12 +774,16 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     heatLed.material.color.setHex(state.heater ? 0xff5a1f : 0x333333);
     warm.intensity = hp * 4;
 
+    const prevOpen = windowOpen;
     windowOpen += ((state.window ? 1 : 0) - windowOpen) * Math.min(1, dt * 3);
-    for (const s of sashes) s.pivot.rotation.y = -s.dir * windowOpen * 1.5;
+    if (Math.abs(windowOpen - prevOpen) > 1e-4) {
+      for (const s of sashes) s.pivot.rotation.y = -s.dir * windowOpen * 1.5;
+      renderer.shadowMap.needsUpdate = true;
+    }
 
-    stepGas(propaneGas, dt, 'propane', 0.08 + Math.min(1, state.propane / 1200) * 0.3, state.propaneLeak ? 40 : 0, propaneSource, state.window);
-    stepGas(methaneGas, dt, 'methane', 0.08 + Math.min(1, state.methane / 1200) * 0.3, state.methaneLeak ? 40 : 0, methaneSource, state.window);
-    stepGas(heatGas, dt, 'heat', 0.12 * hp, hp > 0.3 ? 20 * hp : 0, heaterSource, false);
+    gasAlive = stepGas(propaneGas, dt, 'propane', 0.08 + Math.min(1, state.propane / 1200) * 0.3, state.propaneLeak ? 40 : 0, propaneSource, state.window)
+      + stepGas(methaneGas, dt, 'methane', 0.08 + Math.min(1, state.methane / 1200) * 0.3, state.methaneLeak ? 40 : 0, methaneSource, state.window)
+      + stepGas(heatGas, dt, 'heat', 0.12 * hp, hp > 0.3 ? 20 * hp : 0, heaterSource, false);
 
     const buzzing = state.buzzer > 0;
     if (state.led > 0) device.userData.setLed('alarm', 0.4 + state.led * 0.6);
@@ -766,7 +804,9 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     if (tvAcc > 0.25) { tvAcc = 0; drawTV(t, state); }
     composer.render(dt);
   }
-  raf = requestAnimationFrame(frame);
+  // Compile every shader before the first frame without blocking the page
+  // (uses KHR_parallel_shader_compile where the browser supports it).
+  renderer.compileAsync(scene, camera).catch(() => {}).finally(() => { raf = requestAnimationFrame(frame); });
 
   return {
     update(s) { state = { ...state, ...s }; },
