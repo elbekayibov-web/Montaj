@@ -6,10 +6,13 @@
 // Both are called through the OpenAI-compatible Chat Completions format, so the
 // browser receives the same streaming response either way.
 
+import { SYSTEM_PROMPT, labContext } from './_prompt.js';
+
 export const config = { runtime: 'edge' };
 
 const MAX_MESSAGES = 30;
 const MAX_CHARS = 60000;
+const MAX_CONTEXT = 20000;
 
 function provider() {
   if (process.env.GEMINI_API_KEY) {
@@ -51,10 +54,16 @@ export default async function handler(req) {
   try { body = await req.json(); } catch { return json(400, { error: { message: 'Invalid JSON' } }); }
   const messages = Array.isArray(body?.messages) ? body.messages.slice(-MAX_MESSAGES) : null;
   if (!messages?.length) return json(400, { error: { message: 'messages are required' } });
-  const clean = messages
-    .filter((m) => m && ['system', 'user', 'assistant'].includes(m.role) && typeof m.content === 'string')
+  // The instructions come only from the server; the browser sends the chat
+  // turns plus a snapshot of the lab (code, wiring, output) as plain data.
+  const turns = messages
+    .filter((m) => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string' && m.content.trim())
     .map((m) => ({ role: m.role, content: m.content }));
-  if (clean.reduce((n, m) => n + m.content.length, 0) > MAX_CHARS) return json(413, { error: { message: 'The conversation is too long — start a new chat.' } });
+  if (turns.at(-1)?.role !== 'user') return json(400, { error: { message: 'The last message must be from the user.' } });
+  if (turns.reduce((n, m) => n + m.content.length, 0) > MAX_CHARS) return json(413, { error: { message: 'The conversation is too long — start a new chat.' } });
+  const clean = [{ role: 'system', content: SYSTEM_PROMPT }];
+  if (typeof body.context === 'string' && body.context.trim()) clean.push({ role: 'system', content: labContext(body.context.slice(0, MAX_CONTEXT)) });
+  clean.push(...turns);
 
   const upstream = await fetch(p.url, {
     method: 'POST',

@@ -86,6 +86,9 @@ API kalit faqat Vercel’da saqlanadi va brauzerga yuborilmaydi:
 2. Vercel → loyiha → **Settings → Environment Variables** → nomi `GEMINI_API_KEY`, qiymati — kalit → **Save**.
 3. **Deployments** → oxirgi deploy → **⋯ → Redeploy**.
 
+Yordamchining ko‘rsatmalari `api/_prompt.js` faylida — ularni shu yerda o‘zgartirish mumkin.
+Saytni ochgan har kim (masalan, ustoz) shu server kaliti orqali yordamchidan foydalanadi, o‘z kaliti kerak emas.
+
 Ixtiyoriy: `GEMINI_MODEL` (standart `gemini-flash-latest`). `GEMINI_API_KEY` bo‘lmasa, `OPENAI_API_KEY` ishlatiladi.
 
 Har bir savol bilan avtomatik yuboriladi: sketch (qator raqamlari bilan), ulanish sxemasi, kompilyator xatolari,

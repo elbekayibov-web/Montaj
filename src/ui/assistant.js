@@ -1,6 +1,6 @@
-// AI assistant panel: chats with an OpenAI-compatible Chat Completions API
-// using the user's own API key (kept in this browser only). Every request is
-// sent with fresh context: the sketch, wiring, compiler output, serial log
+// AI assistant panel: chats through the site's /api/chat function, which holds
+// the API key and the assistant's instructions on the server, so every visitor
+// can use it without a key of their own. Every request is sent with fresh context: the sketch, wiring, compiler output, serial log
 // and sensor readings, so questions like "why is the buzzer silent?" can be
 // answered about the actual state of the lab.
 
@@ -9,13 +9,6 @@ const store = {
   set(k, v) { try { localStorage.setItem(`nafas2:ai:${k}`, JSON.stringify(v)); } catch { /* private mode */ } },
 };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-
-const SYSTEM = `You are the NAFAS Lab assistant, a friendly Arduino tutor built into a virtual laboratory.
-Students write Arduino sketches that run on a simulated board inside a 3D room with a gas/temperature safety device (NAFAS Nano).
-- Explain how code and the device work in simple terms.
-- When there is a compile error or a bug, point to the exact line number and show the smallest fix as a code block.
-- Base your answers on the context below (sketch, wiring, compiler output, serial log, sensor readings); do not invent pins.
-- Answer in the same language the student writes in. Keep answers short unless asked for detail.`;
 
 const QUICK = [
   'Explain this sketch line by line',
@@ -61,7 +54,6 @@ export function createAssistant(root, { getContext }) {
       </div>
       <div class="ai-actions">
         <button class="ai-btn" data-act="clear" title="New chat">New chat</button>
-        <button class="ai-btn" data-act="settings" title="API settings">Settings</button>
       </div>
     </div>
     <div class="ai-body">
@@ -73,14 +65,6 @@ export function createAssistant(root, { getContext }) {
         </form>
       </div>
       <aside class="ai-side">
-        <div class="ai-settings" hidden>
-          <p>The assistant uses the site's own server. Optionally, use your own OpenAI-compatible API key instead (stored only in this browser):</p>
-          <label>Personal API key (optional)<input type="password" id="aiKey" placeholder="sk-…" autocomplete="off" /></label>
-          <label>Model<input type="text" id="aiModel" placeholder="gpt-4o-mini" /></label>
-          <label>API base URL<input type="text" id="aiBase" placeholder="https://api.openai.com/v1" /></label>
-          <button class="ai-save" type="button">Save</button>
-          <p>Leave the key empty to use the site's server.</p>
-        </div>
         <div class="ai-context">
           <div class="ai-side-title">Sent with every question</div>
           <label class="ai-ctx"><input type="checkbox" id="aiCtx" checked /> <span>Lab context</span></label>
@@ -91,48 +75,20 @@ export function createAssistant(root, { getContext }) {
   const $ = (s) => root.querySelector(s);
   const msgsEl = $('.ai-msgs');
   const input = $('#aiInput');
-  const settings = $('.ai-settings');
   let history = store.get('history', []);
+  // Personal keys are no longer used; forget any saved by older versions.
+  try { for (const k of ['key', 'model', 'base']) localStorage.removeItem(`nafas2:ai:${k}`); } catch { /* private mode */ }
   let controller = null;
 
-  const cfg = () => ({
-    key: store.get('key', ''),
-    model: store.get('model', '') || 'gpt-4o-mini',
-    base: (store.get('base', '') || 'https://api.openai.com/v1').replace(/\/+$/, ''),
-  });
   function showModel() {
-    const c = cfg();
-    if (c.key) {
-      $('.ai-model').textContent = `${c.model} · your key`;
-      root.classList.remove('no-key');
-      return;
-    }
-    $('.ai-model').textContent = '';
     fetch('/api/chat').then((r) => (r.ok ? r.json() : null)).then((info) => {
-      $('.ai-model').textContent = info?.ready ? `${info.provider} · ${info.model}` : 'Server key not set — see Settings';
+      $('.ai-model').textContent = info?.ready ? `${info.provider} · ${info.model}` : 'AI is not configured on the server yet';
       root.classList.toggle('no-key', !info?.ready);
     }).catch(() => {
-      $('.ai-model').textContent = 'Server not reachable — add your own key in Settings';
+      $('.ai-model').textContent = 'Server not reachable';
       root.classList.add('no-key');
     });
   }
-  function openSettings(open = settings.hidden) {
-    settings.hidden = !open;
-    if (open) {
-      const c = cfg();
-      $('#aiKey').value = c.key;
-      $('#aiModel').value = store.get('model', '');
-      $('#aiBase').value = store.get('base', '');
-      $('#aiKey').focus();
-    }
-  }
-  $('.ai-save').onclick = () => {
-    store.set('key', $('#aiKey').value.trim());
-    store.set('model', $('#aiModel').value.trim());
-    store.set('base', $('#aiBase').value.trim());
-    settings.hidden = true;
-    showModel();
-  };
 
   function renderContextList() {
     const c = getContext();
@@ -177,36 +133,24 @@ export function createAssistant(root, { getContext }) {
   async function ask(question) {
     question = question.trim();
     if (!question || controller) return;
-    const c = cfg();
     history.push({ role: 'user', content: question });
     const reply = { role: 'assistant', content: '' };
     history.push(reply);
     render();
     root.classList.add('busy');
     controller = new AbortController();
-    const messages = [{ role: 'system', content: SYSTEM }];
-    if ($('#aiCtx').checked) messages.push({ role: 'system', content: contextMessage() });
-    for (const m of history.slice(0, -1).slice(-16)) if (!m.error) messages.push({ role: m.role, content: m.content });
+    const messages = history.slice(0, -1).filter((m) => !m.error).slice(-16).map((m) => ({ role: m.role, content: m.content }));
     try {
-      // Without a personal key the request goes through the site's own
-      // /api/chat function, which holds the key server-side.
-      const res = c.key
-        ? await fetch(`${c.base}/chat/completions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${c.key}` },
-          body: JSON.stringify({ model: c.model, messages, stream: true }),
-          signal: controller.signal,
-        })
-        : await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages }),
-          signal: controller.signal,
-        });
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, context: $('#aiCtx').checked ? contextMessage() : '' }),
+        signal: controller.signal,
+      });
       if (!res.ok) {
         let detail = '';
         try { detail = (await res.json()).error?.message || ''; } catch { /* not json */ }
-        throw new Error(res.status === 401 ? 'The API key was rejected (401). Check it in Settings.' : `API error ${res.status}${detail ? `: ${detail}` : ''}`);
+        throw new Error(res.status === 429 ? 'Too many questions at once — wait a minute and try again.' : `API error ${res.status}${detail ? `: ${detail}` : ''}`);
       }
       const reader = res.body.getReader();
       const dec = new TextDecoder();
@@ -234,7 +178,7 @@ export function createAssistant(root, { getContext }) {
       else {
         reply.error = true;
         reply.content = err instanceof TypeError
-          ? 'Could not reach the API. Check your internet connection and the API base URL. (Previews that block outside connections cannot reach it; the deployed site can.)'
+          ? 'Could not reach the server. Check your internet connection.'
           : err.message;
       }
     } finally {
@@ -258,7 +202,6 @@ export function createAssistant(root, { getContext }) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('.ai-composer').requestSubmit(); }
   });
   input.addEventListener('input', () => { input.style.height = ''; input.style.height = `${Math.min(160, input.scrollHeight)}px`; });
-  root.querySelector('[data-act="settings"]').onclick = () => openSettings();
   root.querySelector('[data-act="clear"]').onclick = () => { controller?.abort(); history = []; store.set('history', history); render(); };
 
   showModel();
