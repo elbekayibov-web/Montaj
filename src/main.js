@@ -9,6 +9,7 @@ import { Buzzer } from './ui/audio.js';
 import { createCircuit } from './ui/circuit.js';
 import { icon } from './ui/icons.js';
 import { createAssistant } from './ui/assistant.js';
+import { openPromptDoc } from './ui/promptDoc.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -282,7 +283,8 @@ function renderExamples() {
     const cur = !dirty && currentExample === e.id;
     const conf = confirming === `ex:${e.id}`;
     return `<button class="file-item${cur ? ' current' : ''}${conf ? ' confirm' : ''}" data-ex="${e.id}"><span class="fi">${FILE_ICON}</span><span class="meta"><span>${esc(e.title)}</span><small>${conf ? 'Unsaved edits — click again to replace' : esc(e.note)}</small></span></button>`;
-  }).join('');
+  }).join('') + `<button class="file-item doc" data-doc><span class="fi">${icon('doc')}</span><span class="meta"><span>AI assistant instructions</span><small>System prompt · view and copy</small></span></button>`;
+  $('[data-doc]', $('#examplesList')).onclick = openPromptDoc;
   for (const b of $$('[data-ex]', $('#examplesList'))) {
     b.onclick = () => {
       const ex = EXAMPLES.find((x) => x.id === b.dataset.ex);

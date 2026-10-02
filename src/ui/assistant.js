@@ -64,13 +64,6 @@ export function createAssistant(root, { getContext }) {
           <button type="submit" class="ai-send" title="Send (Enter)"><svg viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6"/></svg></button>
         </form>
       </div>
-      <aside class="ai-side">
-        <div class="ai-context">
-          <div class="ai-side-title">Sent with every question</div>
-          <label class="ai-ctx"><input type="checkbox" id="aiCtx" checked /> <span>Lab context</span></label>
-          <ul class="ai-ctx-list"></ul>
-        </div>
-      </aside>
     </div>`;
   const $ = (s) => root.querySelector(s);
   const msgsEl = $('.ai-msgs');
@@ -88,17 +81,6 @@ export function createAssistant(root, { getContext }) {
       $('.ai-model').textContent = 'Server not reachable';
       root.classList.add('no-key');
     });
-  }
-
-  function renderContextList() {
-    const c = getContext();
-    $('.ai-ctx-list').innerHTML = [
-      `${c.fileName} · ${c.code.split('\n').length} lines`,
-      `${c.board} wiring`,
-      c.output.trim() ? 'Compiler output' : null,
-      c.serial.trim() ? `Serial Monitor · last ${Math.min(30, c.serial.trim().split('\n').length)} lines` : null,
-      'Sensor readings and room state',
-    ].filter(Boolean).map((t) => `<li>${esc(t)}</li>`).join('');
   }
 
   function render() {
@@ -144,7 +126,7 @@ export function createAssistant(root, { getContext }) {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages, context: $('#aiCtx').checked ? contextMessage() : '' }),
+        body: JSON.stringify({ messages, context: contextMessage() }),
         signal: controller.signal,
       });
       if (!res.ok) {
@@ -206,8 +188,6 @@ export function createAssistant(root, { getContext }) {
 
   showModel();
   render();
-  renderContextList();
-  setInterval(renderContextList, 3000);
 
   return {
     ask(q) { root.scrollIntoView({ behavior: 'smooth', block: 'start' }); ask(q); },

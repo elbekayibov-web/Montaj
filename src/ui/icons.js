@@ -8,6 +8,7 @@ export const ICON_PATHS = {
   methane: '<path d="M12 3.2c3.1 3.2 5.6 5.9 5.6 9.7a5.6 5.6 0 0 1-11.2 0c0-2.4 1.2-4.1 2.6-5.4.2 1.9 1.1 3 2.4 3.3-.4-2.7-.1-5.1.6-7.6z"/>',
   window: '<rect x="4.5" y="3.5" width="15" height="17" rx="2.5"/><path d="M12 3.5v17M4.5 12h15" class="line"/>',
   temperature: '<path d="M9.5 14.2V5.5a2.5 2.5 0 0 1 5 0v8.7a4.5 4.5 0 1 1-5 0z"/><path d="M12 9.5v7" class="line"/>',
+  doc: '<path d="M6.5 3.5h7.5l4.5 4.5v10.5a2 2 0 0 1-2 2h-10a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M9 12.5h6M9 16h4" class="line"/>',
   folder: '<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
 };
 
