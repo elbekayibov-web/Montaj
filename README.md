@@ -1,5 +1,7 @@
 # NAFAS — virtual Arduino laboratoriyasi
 
+**Sayt:** https://montaj-pi.vercel.app/ (Vercel — har bir push’dan keyin avtomatik yangilanadi)
+
 Talaba Arduino kodini yozadi, **Verify** bilan tekshiradi, **Upload** bilan virtual
 qurilmaga yuklaydi va 3D xonada qurilma aynan shu kod bo‘yicha qanday ishlashini
 kuzatadi. Sayt TZ (texnik topshiriq) asosida qurilgan.
