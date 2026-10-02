@@ -150,15 +150,14 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     addWallPiece(M.accent, T, yb - ya, zb - za, X0 - T / 2, (ya + yb) / 2, (za + zb) / 2);
   }
   // baseboards + crown moulding
-  const trimRun = (len, x, z, alongX) => {
-    const base = box(alongX ? len : 0.025, 0.12, alongX ? 0.025 : len, M.trim);
-    scene.add(at(base, x, 0.06, z));
-    const crown = box(alongX ? len : 0.06, 0.08, alongX ? 0.06 : len, M.trim);
-    scene.add(at(crown, alongX ? x : x + 0.02, H - 0.04, alongX ? z + 0.02 : z));
-  };
-  trimRun(W, 0, Z0 + 0.012, true);
-  trimRun(door.z0 - Z0, X0 + 0.012, (Z0 + door.z0) / 2, false);
-  trimRun(Z0 + D - door.z1, X0 + 0.012, (door.z1 + Z0 + D) / 2, false);
+  const baseRun = (len, x, z, alongX) => scene.add(at(box(alongX ? len : 0.025, 0.12, alongX ? 0.025 : len, M.trim), x, 0.06, z));
+  const crownRun = (len, x, z, alongX) => scene.add(at(box(alongX ? len : 0.06, 0.08, alongX ? 0.06 : len, M.trim), alongX ? x : x + 0.02, H - 0.04, alongX ? z + 0.02 : z));
+  baseRun(W, 0, Z0 + 0.012, true);
+  crownRun(W, 0, Z0 + 0.012, true);
+  // the baseboard stops at the door; the crown moulding runs the full wall
+  baseRun(door.z0 - Z0, X0 + 0.012, (Z0 + door.z0) / 2, false);
+  baseRun(Z0 + D - door.z1, X0 + 0.012, (door.z1 + Z0 + D) / 2, false);
+  crownRun(D, X0 + 0.012, 0, false);
   const capMat = std(0x10181a);
   scene.add(at(box(W + T, 0.015, T, capMat), -T / 2, H + 0.008, Z0 - T / 2));
   scene.add(at(box(T, 0.015, D, capMat), X0 - T / 2, H + 0.008, 0));
@@ -374,9 +373,10 @@ export function createRoom(canvasEl, { onDeviceClick } = {}) {
     // brass picture light
     g.add(at(cyl(0.025, 0.025, w * 0.5, M.brass, 16).rotateX(Math.PI / 2), 0.14, h / 2 + 0.16, 0));
     g.add(at(cyl(0.008, 0.008, 0.16, M.brass, 8).rotateZ(Math.PI / 2), 0.07, h / 2 + 0.14, 0));
-    const spot = new THREE.SpotLight(0xffd1a0, 5, 3, 0.75, 0.9, 2);
-    at(spot, 0.2, h / 2 + 0.14, 0);
-    spot.target.position.set(-0.2, -h * 0.25, 0);
+    // soft, even wash over the canvas rather than a hot spot at the top
+    const spot = new THREE.SpotLight(0xffd8b0, 1.3, 3.5, 0.95, 1, 2);
+    at(spot, 0.32, h / 2 + 0.14, 0);
+    spot.target.position.set(-0.2, -h * 0.55, 0);
     g.add(spot, spot.target);
     at(g, X0 + 0.03, y, z);
     scene.add(g);
