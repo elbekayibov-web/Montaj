@@ -151,7 +151,7 @@ export function createAssistant(root, { getContext }) {
       for (const b of msgsEl.querySelectorAll('.ai-quick button')) b.onclick = () => ask(b.textContent);
       return;
     }
-    msgsEl.innerHTML = history.map((m) => `<div class="ai-msg ${m.role}${m.error ? ' error' : ''}">${m.role === 'user' ? `<p>${esc(m.content)}</p>` : md(m.content) || '<span class="ai-typing"><i></i><i></i><i></i></span>'}</div>`).join('');
+    msgsEl.innerHTML = history.map((m) => `<div class="ai-msg is-${m.role}${m.error ? ' error' : ''}">${m.role === 'user' ? `<p>${esc(m.content)}</p>` : md(m.content) || '<span class="ai-typing"><i></i><i></i><i></i></span>'}</div>`).join('');
     msgsEl.scrollTop = msgsEl.scrollHeight;
   }
   msgsEl.addEventListener('click', (e) => {
