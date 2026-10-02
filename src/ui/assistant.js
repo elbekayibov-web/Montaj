@@ -56,7 +56,7 @@ export function createAssistant(root, { getContext }) {
   root.innerHTML = `
     <div class="ai-head">
       <div class="ai-title">
-        <span class="ai-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9.4 13.8 11.2 12 16l-1.8-4.8L5.5 9.4l4.7-1.8z"/><path d="M18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></span>
+        <span class="ai-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M6.8 12.6c1.7-2.6 3.5-2.6 5.2 0s3.5 2.6 5.2 0"/></svg></span>
         <div><b>Assistant</b><span class="ai-model"></span></div>
       </div>
       <div class="ai-actions">
@@ -74,11 +74,12 @@ export function createAssistant(root, { getContext }) {
       </div>
       <aside class="ai-side">
         <div class="ai-settings" hidden>
-          <label>OpenAI API key<input type="password" id="aiKey" placeholder="sk-…" autocomplete="off" /></label>
+          <p>The assistant uses the site's own server. Optionally, use your own OpenAI key instead (stored only in this browser):</p>
+          <label>Personal API key (optional)<input type="password" id="aiKey" placeholder="sk-…" autocomplete="off" /></label>
           <label>Model<input type="text" id="aiModel" placeholder="gpt-4o-mini" /></label>
           <label>API base URL<input type="text" id="aiBase" placeholder="https://api.openai.com/v1" /></label>
           <button class="ai-save" type="button">Save</button>
-          <p>The key is stored only in this browser and sent only to the API address above. A ChatGPT Plus subscription does not include API access — create a key at platform.openai.com.</p>
+          <p>Leave the key empty to use the site's server. A ChatGPT Plus subscription does not include API access.</p>
         </div>
         <div class="ai-context">
           <div class="ai-side-title">Sent with every question</div>
@@ -101,8 +102,19 @@ export function createAssistant(root, { getContext }) {
   });
   function showModel() {
     const c = cfg();
-    $('.ai-model').textContent = c.key ? `ChatGPT · ${c.model}` : 'Not connected — add your API key';
-    root.classList.toggle('no-key', !c.key);
+    if (c.key) {
+      $('.ai-model').textContent = `ChatGPT · ${c.model} · your key`;
+      root.classList.remove('no-key');
+      return;
+    }
+    $('.ai-model').textContent = 'ChatGPT';
+    fetch('/api/chat').then((r) => (r.ok ? r.json() : null)).then((info) => {
+      $('.ai-model').textContent = info?.ready ? `ChatGPT · ${info.model}` : 'Server key not set — see Settings';
+      root.classList.toggle('no-key', !info?.ready);
+    }).catch(() => {
+      $('.ai-model').textContent = 'Server not reachable — add your own key in Settings';
+      root.classList.add('no-key');
+    });
   }
   function openSettings(open = settings.hidden) {
     settings.hidden = !open;
@@ -167,12 +179,6 @@ export function createAssistant(root, { getContext }) {
     if (!question || controller) return;
     const c = cfg();
     history.push({ role: 'user', content: question });
-    if (!c.key) {
-      history.push({ role: 'assistant', content: 'Add your OpenAI API key in **Settings** to start chatting.', error: true });
-      render();
-      openSettings(true);
-      return;
-    }
     const reply = { role: 'assistant', content: '' };
     history.push(reply);
     render();
@@ -182,12 +188,21 @@ export function createAssistant(root, { getContext }) {
     if ($('#aiCtx').checked) messages.push({ role: 'system', content: contextMessage() });
     for (const m of history.slice(0, -1).slice(-16)) if (!m.error) messages.push({ role: m.role, content: m.content });
     try {
-      const res = await fetch(`${c.base}/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${c.key}` },
-        body: JSON.stringify({ model: c.model, messages, stream: true }),
-        signal: controller.signal,
-      });
+      // Without a personal key the request goes through the site's own
+      // /api/chat function, which holds the key server-side.
+      const res = c.key
+        ? await fetch(`${c.base}/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${c.key}` },
+          body: JSON.stringify({ model: c.model, messages, stream: true }),
+          signal: controller.signal,
+        })
+        : await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages }),
+          signal: controller.signal,
+        });
       if (!res.ok) {
         let detail = '';
         try { detail = (await res.json()).error?.message || ''; } catch { /* not json */ }
