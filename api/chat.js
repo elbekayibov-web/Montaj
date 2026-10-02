@@ -1,7 +1,8 @@
 // Server-side proxy for the AI assistant (Vercel Edge Function).
 // API keys live only in Vercel environment variables and are never sent to the browser.
 //   GEMINI_API_KEY  — Google Gemini (preferred; free tier at aistudio.google.com)
-//                     optional GEMINI_MODEL (default gemini-flash-latest)
+//                     optional GEMINI_MODEL (default gemini-flash-latest); when a model
+//                     is busy (503/429) the next one in GEMINI_FALLBACKS is tried
 //   OPENAI_API_KEY  — OpenAI fallback, optional OPENAI_MODEL (default gpt-4.1)
 // Both are called through the OpenAI-compatible Chat Completions format, so the
 // browser receives the same streaming response either way.
@@ -21,6 +22,7 @@ function provider() {
       url: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
       key: process.env.GEMINI_API_KEY,
       model: process.env.GEMINI_MODEL || 'gemini-flash-latest',
+      fallbacks: ['gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
     };
   }
   if (process.env.OPENAI_API_KEY) {
@@ -29,6 +31,7 @@ function provider() {
       url: 'https://api.openai.com/v1/chat/completions',
       key: process.env.OPENAI_API_KEY,
       model: process.env.OPENAI_MODEL || 'gpt-4.1',
+      fallbacks: [],
     };
   }
   return null;
@@ -65,12 +68,26 @@ export default async function handler(req) {
   if (typeof body.context === 'string' && body.context.trim()) clean.push({ role: 'system', content: labContext(body.context.slice(0, MAX_CONTEXT)) });
   clean.push(...turns);
 
-  const upstream = await fetch(p.url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${p.key}` },
-    // Gemini's thinking tokens count toward the limit, so leave room for the answer.
-    body: JSON.stringify({ model: p.model, messages: clean, stream: true, max_tokens: 4096 }),
-  });
+  // Busy (429/503) or overloaded models are retried once, then the next model
+  // is tried; a model that does not exist (404) is skipped.
+  const models = [...new Set([p.model, ...p.fallbacks])];
+  let upstream;
+  let used = p.model;
+  outer: for (const model of models) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      used = model;
+      upstream = await fetch(p.url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${p.key}` },
+        // Gemini's thinking tokens count toward the limit, so leave room for the answer.
+        body: JSON.stringify({ model, messages: clean, stream: true, max_tokens: 4096 }),
+      });
+      if (upstream.ok) break outer;
+      if (upstream.status === 404) break;
+      if (![429, 500, 503].includes(upstream.status)) break outer;
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 1200));
+    }
+  }
   if (!upstream.ok) {
     let detail = '';
     try {
@@ -80,6 +97,6 @@ export default async function handler(req) {
     return json(upstream.status, { error: { message: detail || `${p.name} error ${upstream.status}` } });
   }
   return new Response(upstream.body, {
-    headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-model': p.model },
+    headers: { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', 'x-model': used },
   });
 }

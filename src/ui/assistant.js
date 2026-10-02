@@ -150,7 +150,7 @@ export function createAssistant(root, { getContext }) {
       if (!res.ok) {
         let detail = '';
         try { detail = (await res.json()).error?.message || ''; } catch { /* not json */ }
-        throw new Error(res.status === 429 ? 'Too many questions at once — wait a minute and try again.' : `API error ${res.status}${detail ? `: ${detail}` : ''}`);
+        throw new Error(res.status === 429 ? 'Too many questions at once — wait a minute and try again.' : res.status === 503 ? 'The AI service is busy right now. Wait a few seconds and send your question again.' : `API error ${res.status}${detail ? `: ${detail}` : ''}`);
       }
       const reader = res.body.getReader();
       const dec = new TextDecoder();
