@@ -284,7 +284,8 @@ function renderExamples() {
     const conf = confirming === `ex:${e.id}`;
     return `<button class="file-item${cur ? ' current' : ''}${conf ? ' confirm' : ''}" data-ex="${e.id}"><span class="fi">${FILE_ICON}</span><span class="meta"><span>${esc(e.title)}</span><small>${conf ? 'Unsaved edits — click again to replace' : esc(e.note)}</small></span></button>`;
   }).join('') + `<button class="file-item doc" data-doc><span class="fi">${icon('doc')}</span><span class="meta"><span>AI assistant instructions</span><small>System prompt · view and copy</small></span></button>`;
-  $('[data-doc]', $('#examplesList')).onclick = openPromptDoc;
+  const docItem = $('[data-doc]', $('#examplesList'));
+  docItem.onclick = () => { docItem.classList.add('current'); openPromptDoc(() => docItem.classList.remove('current')); };
   for (const b of $$('[data-ex]', $('#examplesList'))) {
     b.onclick = () => {
       const ex = EXAMPLES.find((x) => x.id === b.dataset.ex);
