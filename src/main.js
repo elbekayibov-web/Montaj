@@ -10,6 +10,10 @@ import { createCircuit } from './ui/circuit.js';
 import { icon } from './ui/icons.js';
 import { createAssistant } from './ui/assistant.js';
 import { openPromptDoc } from './ui/promptDoc.js';
+import { inject as injectAnalytics } from '@vercel/analytics';
+
+// Vercel Web Analytics (visitors, countries, devices, referrers).
+injectAnalytics();
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
