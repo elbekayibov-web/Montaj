@@ -74,12 +74,12 @@ export function createAssistant(root, { getContext }) {
       </div>
       <aside class="ai-side">
         <div class="ai-settings" hidden>
-          <p>The assistant uses the site's own server. Optionally, use your own OpenAI key instead (stored only in this browser):</p>
+          <p>The assistant uses the site's own server. Optionally, use your own OpenAI-compatible API key instead (stored only in this browser):</p>
           <label>Personal API key (optional)<input type="password" id="aiKey" placeholder="sk-…" autocomplete="off" /></label>
           <label>Model<input type="text" id="aiModel" placeholder="gpt-4o-mini" /></label>
           <label>API base URL<input type="text" id="aiBase" placeholder="https://api.openai.com/v1" /></label>
           <button class="ai-save" type="button">Save</button>
-          <p>Leave the key empty to use the site's server. A ChatGPT Plus subscription does not include API access.</p>
+          <p>Leave the key empty to use the site's server.</p>
         </div>
         <div class="ai-context">
           <div class="ai-side-title">Sent with every question</div>
@@ -103,13 +103,13 @@ export function createAssistant(root, { getContext }) {
   function showModel() {
     const c = cfg();
     if (c.key) {
-      $('.ai-model').textContent = `ChatGPT · ${c.model} · your key`;
+      $('.ai-model').textContent = `${c.model} · your key`;
       root.classList.remove('no-key');
       return;
     }
-    $('.ai-model').textContent = 'ChatGPT';
+    $('.ai-model').textContent = '';
     fetch('/api/chat').then((r) => (r.ok ? r.json() : null)).then((info) => {
-      $('.ai-model').textContent = info?.ready ? `ChatGPT · ${info.model}` : 'Server key not set — see Settings';
+      $('.ai-model').textContent = info?.ready ? `${info.provider} · ${info.model}` : 'Server key not set — see Settings';
       root.classList.toggle('no-key', !info?.ready);
     }).catch(() => {
       $('.ai-model').textContent = 'Server not reachable — add your own key in Settings';

@@ -77,11 +77,16 @@ metan shipga ko‘tariladi.
 - Uy egasiga ogohlantirish yuborish usuli, 10 metr radius, ChatGPT/AI yordamchi — qo‘shilmagan.
 - Qo‘shilgan takliflar: grafiklar, qayta boshlash tugmasi, tayyor misollar, deraza, exploded 3D ko‘rinish.
 
-## AI yordamchi (ChatGPT)
+## AI yordamchi (Gemini)
 
-Sahifaning eng pastida **Assistant** bo‘limi bor. **Settings** tugmasini bosib OpenAI API kalitini kiriting
-(platform.openai.com → API keys). ChatGPT Plus obunasi API’ni o‘z ichiga olmaydi — API alohida to‘lanadi.
-Kalit faqat brauzeringizda (localStorage) saqlanadi va faqat ko‘rsatilgan API manziliga yuboriladi.
+Sahifaning eng pastida **Assistant** bo‘limi bor. U saytning serveri (`api/chat.js`) orqali ishlaydi,
+API kalit faqat Vercel’da saqlanadi va brauzerga yuborilmaydi:
+
+1. aistudio.google.com → **Get API key** → **Create API key** (bepul limit bor).
+2. Vercel → loyiha → **Settings → Environment Variables** → nomi `GEMINI_API_KEY`, qiymati — kalit → **Save**.
+3. **Deployments** → oxirgi deploy → **⋯ → Redeploy**.
+
+Ixtiyoriy: `GEMINI_MODEL` (standart `gemini-flash-latest`). `GEMINI_API_KEY` bo‘lmasa, `OPENAI_API_KEY` ishlatiladi.
 
 Har bir savol bilan avtomatik yuboriladi: sketch (qator raqamlari bilan), ulanish sxemasi, kompilyator xatolari,
 Serial Monitor’ning oxirgi qatorlari, sensor qiymatlari va xona holati. Model va API manzilini ham o‘zgartirish mumkin
