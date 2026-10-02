@@ -2,7 +2,7 @@
 // API keys live only in Vercel environment variables and are never sent to the browser.
 //   GEMINI_API_KEY  — Google Gemini (preferred; free tier at aistudio.google.com)
 //                     optional GEMINI_MODEL (default gemini-flash-latest); when a model
-//                     is busy (503/429) the next one in GEMINI_FALLBACKS is tried
+//                     is busy (503/429) the fallback models are tried in turn
 //   OPENAI_API_KEY  — OpenAI fallback, optional OPENAI_MODEL (default gpt-4.1)
 // Both are called through the OpenAI-compatible Chat Completions format, so the
 // browser receives the same streaming response either way.
@@ -83,9 +83,11 @@ export default async function handler(req) {
         body: JSON.stringify({ model, messages: clean, stream: true, max_tokens: 4096 }),
       });
       if (upstream.ok) break outer;
+      // Shows up in Vercel → Logs, so failures can be diagnosed.
+      console.warn(`${p.name} ${model} → ${upstream.status} (attempt ${attempt + 1})`);
       if (upstream.status === 404) break;
       if (![429, 500, 503].includes(upstream.status)) break outer;
-      if (attempt === 0) await new Promise((r) => setTimeout(r, 1200));
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 1500));
     }
   }
   if (!upstream.ok) {
